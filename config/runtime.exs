@@ -175,5 +175,5 @@ if config_env() == :prod do
     base_url: System.get_env("MAILGUN_BASE_URL")
 
   # See https://hexdocs.pm/swoosh/Swoosh.html#module-installation for details.
-  config :swoosh, :api_client, Swoosh.ApiClient.Hackney
+  config :swoosh, :api_client, Swoosh.ApiClient.Req
 end
