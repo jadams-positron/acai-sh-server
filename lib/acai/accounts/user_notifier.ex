@@ -6,10 +6,13 @@ defmodule Acai.Accounts.UserNotifier do
 
   # Delivers the email using the application mailer.
   defp deliver(recipient, subject, body) do
+    from_name = Application.get_env(:canvis, :mail_from_name, "Acai.sh")
+    from_email = Application.get_env(:canvis, :mail_from_email, "noreply@mg.acai.sh")
+
     email =
       new()
       |> to(recipient)
-      |> from({"Acai", "contact@example.com"})
+      |> from({from_name, from_email})
       |> subject(subject)
       |> text_body(body)
 
