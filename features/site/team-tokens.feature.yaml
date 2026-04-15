@@ -1,0 +1,43 @@
+feature:
+    name: team-tokens
+    product: site
+    description: Create and manage team access tokens, which can then be used for permissioned API ops.
+    prerequisites:
+        - Data model and team views must be completed and tested;
+        - data-model.TOKENS
+        - team-list
+        - team-view
+
+components:
+    MAIN:
+        requirements:
+            1: Lists all tokens that have been created for this team, by any user
+            1-1: Lists the token prefix and the token name, created-by attribution, other useful metadata contained in the database (see DATA feature)
+            2: "User education explains that Team Access Tokens provide full read and write access to any resources in the team, except admin actions"
+            3: Can create a new token, with name, optional expiration timestamp (date picker)
+            3-1: Can not edit token scopes, it's the same set of scopes for all tokens
+            3-2: Time picker is local system clock, but gets offset to match UTC
+            4: On creation, user is presented with the token, and educated that they will never be able to see it again
+            4-1: Displayed token has a copy paste button and can be cleanly highlighted with click-drag or triple-mouse click
+            5: Tokens can be revoked by clicking a revoke button
+            5-1: Token revocation triggers confirmation
+
+    USAGE:
+        requirements:
+            1: Renders a mock Usage section with a "coming soon" placeholder.
+
+    INACTIVE:
+        requirements:
+            1: Renders an incative tokens section, collapsed by default
+            2: When opened it shows tokens with Expired and Revoked badges, with expiry date and revocation date
+            3: These tokens are excluded from the main list
+
+constraints:
+    TATSEC:
+        name: Team Access Token Security
+        requirements:
+            1: The system must never persist a raw token to the database or in logs
+            2: API authentication requests must hash the incoming token and query against the token_hash column.
+            3: A token is considered invalid if revoked_at is not null, or if expires_at is in the past.
+            4: Respect the `tats:admin` scope for create and revoke ops
+            5: Respect the `team:read` scope for read ops (everyone can see the list of all existing tokens and their details)

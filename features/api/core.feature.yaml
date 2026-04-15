@@ -1,0 +1,25 @@
+feature:
+    name: core
+    product: api
+    version: 1.0.0
+
+components:
+    API:
+        1: exposes public /api/v1/openapi.json route
+        1-1: renders compliant openapi json spec for this version of the api
+
+constraints:
+    ENG:
+        1: API router pipeline includes OpenApiSpex.Plug.CastAndValidate for request validation
+        2: OpenApiSpex schemas are located exclusively in a dedicated /api/schemas subdirectory
+        3: OpenApiSpex route documentation is defined inline using the operation macro directly in controllers
+        4: All HTTP 2xx JSON responses wrap their payload in a root `data` key
+        5: Controllers use action_fallback to a unified FallbackController for Ecto Changeset errors and 404s
+        6: The :api router pipeline is strictly stateless (must not contain fetch_session or fetch_flash)
+        7: namespaces all endpoints under /api/v1
+        8: All routes and resources are default private, require Authorization header with Bearer token unless otherwise specified
+
+    OPERATIONS:
+        1: Cross-cutting API abuse protections and limits are configurable at runtime via environment-specific configuration
+        2: Security and abuse rejections are emitted through the application logger as structured logs
+        3: Structured abuse logs include safe request metadata and identifiers needed for investigation without logging secret credentials or full request payloads

@@ -1,0 +1,12 @@
+{
+    "name": "acai",
+    "dockerComposeFile": ["../infra/docker-compose.yml"],
+    "runServices": ["db", "devcontainer", "caddy"],
+    "service": "devcontainer",
+    "workspaceFolder": "/app",
+    "remoteUser": "dev",
+    "postCreateCommand": "bash ./.devcontainer/postcreate.sh",
+    "containerEnv": {
+        "TERM": "xterm-256color"
+    }
+}

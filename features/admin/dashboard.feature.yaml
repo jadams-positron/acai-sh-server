@@ -1,0 +1,30 @@
+feature:
+    name: dashboard
+    product: admin
+    description: |
+        The admin dashboard is exposed through a dedicated admin route using the default Phoenix Live Dashboard.
+        Access is restricted to whitelisted admins only.
+        The dashboard provides basic observability into query performance and OS state.
+
+components:
+    MAIN:
+        requirements:
+            1: In the `/t/:team_name` view, whitelisted users see an 'Admin' section with a 'Dashboard' button
+            1-1: Clicking the Dashboard button navigates to `/admin/dashboard/home`
+            2: Users who are not members of any whitelisted team do not see this section or button
+
+constraints:
+    AUTH:
+        requirements:
+            1: The whitelist is the `:global_admin` field (boolean) on the `teams` table
+            1-1: Any authenticated user who is a member of at least one team with `global_admin = true`, with any role, can access `/admin/dashboard`
+            2: The `/admin/dashboard` route requires phoenix 'sudo mode', which is a 20 minute old session
+            2-1: When the session is stale, the user is prompted to log-in again to create a fresh session
+            2-1-note: This is similar to accessing the user settings page in the default phoenix setup, (see `require_sudo_mode/2` plug as well)
+            3: Unauthenticated users are redirected to `/users/log-in`
+            4: Authenticated users with a fresh session who are not members of any whitelisted team are redirected to `/teams`
+
+    ROUTING:
+        requirements:
+            1: This feature adds a dedicated `/admin/dashboard` route for admin access
+            1-note: This feature does not change the existing `/dev/dashboard` behavior

@@ -1,0 +1,125 @@
+defmodule AcaiWeb.Api.OpenApiControllerTest do
+  @moduledoc """
+  Tests for the OpenApiController.
+
+  ACIDs:
+  - core.API.1 - Exposes public /api/v1/openapi.json route
+  - core.API.1-1 - Renders compliant OpenAPI JSON spec
+  - core.ENG.3 - Route documentation is defined inline in controllers
+  """
+
+  use AcaiWeb.ConnCase, async: true
+
+  describe "GET /api/v1/openapi.json" do
+    test "returns valid OpenAPI JSON without authentication", %{conn: conn} do
+      conn = get(conn, "/api/v1/openapi.json")
+
+      assert conn.status == 200
+      assert get_resp_header(conn, "content-type") == ["application/json; charset=utf-8"]
+
+      {:ok, spec} = Jason.decode(conn.resp_body)
+
+      # Verify it's a valid OpenAPI spec
+      assert spec["openapi"] == "3.0.0"
+      assert spec["info"]["title"] == "Acai API"
+      assert spec["info"]["version"] == "1.0.0"
+
+      # Check for security schemes
+      assert spec["components"]["securitySchemes"]["bearerAuth"]["type"] == "http"
+      assert spec["components"]["securitySchemes"]["bearerAuth"]["scheme"] == "bearer"
+
+      implementations_params = spec["paths"]["/implementations"]["get"]["parameters"]
+
+      # implementations.REQUEST.1, implementations.REQUEST.1-1, implementations.REQUEST.2, implementations.REQUEST.3, implementations.REQUEST.4
+      assert Enum.any?(implementations_params, fn param ->
+               param["name"] == "product_name" and param["required"] == false
+             end)
+
+      assert Enum.any?(implementations_params, fn param ->
+               param["name"] == "repo_uri" and param["required"] == false
+             end)
+
+      assert Enum.any?(implementations_params, fn param ->
+               param["name"] == "branch_name" and param["required"] == false
+             end)
+
+      assert Enum.any?(implementations_params, fn param ->
+               param["name"] == "feature_name" and param["required"] == false
+             end)
+
+      # feature-context.REQUEST.1, feature-context.REQUEST.2, feature-context.REQUEST.3
+      feature_context_params = spec["paths"]["/feature-context"]["get"]["parameters"]
+
+      assert Enum.any?(
+               feature_context_params,
+               &(&1["name"] == "product_name" and &1["required"] == true)
+             )
+
+      assert Enum.any?(
+               feature_context_params,
+               &(&1["name"] == "feature_name" and &1["required"] == true)
+             )
+
+      assert Enum.any?(
+               feature_context_params,
+               &(&1["name"] == "implementation_name" and &1["required"] == true)
+             )
+
+      assert Enum.any?(
+               feature_context_params,
+               &(&1["name"] == "statuses" and
+                   String.contains?(
+                     &1["description"],
+                     "statuses=completed&statuses=null"
+                   ))
+             )
+
+      implementation_features_params =
+        spec["paths"]["/implementation-features"]["get"]["parameters"]
+
+      assert Enum.any?(
+               implementation_features_params,
+               &(&1["name"] == "statuses" and
+                   String.contains?(
+                     &1["description"],
+                     "statuses=completed&statuses=null"
+                   ))
+             )
+
+      # feature-states.ENDPOINT.1, feature-states.REQUEST.1-4
+      assert spec["paths"]["/feature-states"]["patch"]["operationId"] ==
+               "AcaiWeb.Api.FeatureStatesController.update"
+
+      assert spec["paths"]["/push"]["post"]["operationId"] ==
+               "AcaiWeb.Api.PushController.create"
+    end
+
+    test "openapi.json route is accessible without Authorization header", %{conn: conn} do
+      # Ensure no Authorization header is set
+      conn = delete_req_header(conn, "authorization")
+      conn = get(conn, "/api/v1/openapi.json")
+
+      assert conn.status == 200
+    end
+
+    test "push request schema excludes deprecated state components and feature-states remains documented" do
+      spec = AcaiWeb.Api.ApiSpec.spec()
+      push_request = spec.components.schemas["PushRequest"]
+      feature_states_request = spec.components.schemas["FeatureStatesRequest"]
+      state_object = spec.components.schemas["StateObject"]
+
+      refute Map.has_key?(push_request.properties, :states)
+      refute String.contains?(push_request.description, "states")
+      refute Map.has_key?(spec.components.schemas, "States")
+
+      assert feature_states_request
+      assert Map.has_key?(feature_states_request.properties, :states)
+
+      assert Map.get(state_object, :"x-struct") ==
+               AcaiWeb.Api.Schemas.ReadSchemas.StateObject
+
+      assert spec.paths["/feature-states"].patch.operationId ==
+               "AcaiWeb.Api.FeatureStatesController.update"
+    end
+  end
+end
