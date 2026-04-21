@@ -838,7 +838,10 @@ defmodule AcaiWeb.ImplementationLiveTest do
     end
 
     # feature-impl-view.LIST.4-1: Rows with non-empty comments render a comment icon beside the Status control
-    test "rows with a non-empty comment show a comment indicator beside status", %{conn: conn, user: user} do
+    test "rows with a non-empty comment show a comment indicator beside status", %{
+      conn: conn,
+      user: user
+    } do
       {team, _role} = create_team_with_owner(user)
       product = create_product(team, "TestProduct")
       impl = create_implementation_for_product(product)

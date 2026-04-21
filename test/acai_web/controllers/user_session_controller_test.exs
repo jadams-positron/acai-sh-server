@@ -17,6 +17,17 @@ defmodule AcaiWeb.UserSessionControllerTest do
       assert response =~ "Log in with email"
     end
 
+    test "favicon uses stable static path", %{
+      conn: conn
+    } do
+      response =
+        conn
+        |> get(~p"/users/log-in")
+        |> html_response(200)
+
+      assert response =~ ~s(<link rel="icon" type="image/svg+xml" href="/favicon.svg">)
+    end
+
     test "renders login page with email filled in (sudo mode)", %{conn: conn, user: user} do
       html =
         conn
