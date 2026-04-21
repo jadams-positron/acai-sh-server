@@ -10,3 +10,5 @@ mix deps.get
 
 # creates the DB, runs migrations, and seeds.exs
 mix ecto.setup
+
+curl -fsSL https://opencode.ai/install | bash

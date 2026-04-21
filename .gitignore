@@ -46,3 +46,5 @@ expert.log
 /priv/repo/structure.sql
 
 .tasks
+
+.opencode

@@ -65,10 +65,6 @@ USER $USERNAME
 # CONFIGURE PATH'
 ENV PATH="/home/linuxbrew/.linuxbrew/bin:${PATH}"
 
-# install opencode
-RUN curl -fsSL https://opencode.ai/install | bash
-
-
 # ~~~~~~~~~~~~~~~~~~~~~~
 #    📦 RELEASE STAGE
 # ~~~~~~~~~~~~~~~~~~~~~~
