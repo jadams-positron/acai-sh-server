@@ -116,6 +116,10 @@ defmodule AcaiWeb.Router do
     end
   end
 
+  scope "/", AcaiWeb do
+    get "/_health", HealthController, :health
+  end
+
   ## Authentication routes
 
   scope "/", AcaiWeb do

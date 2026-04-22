@@ -7,6 +7,9 @@ defmodule Acai.Application do
 
   @impl true
   def start(_type, _args) do
+    # Store start time for uptime tracking
+    Application.put_env(:acai, :start_time, System.system_time(:second))
+
     children = [
       AcaiWeb.Telemetry,
       Acai.Repo,
