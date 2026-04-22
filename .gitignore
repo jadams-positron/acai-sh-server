@@ -37,6 +37,13 @@ npm-debug.log
 
 .env
 
+# Local editor and agent artifacts
+.expert/
+.zed/
+
+# Local infra overrides
+infra/.env
+
 .claude/settings.local.json
 
 # Expert log

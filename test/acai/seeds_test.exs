@@ -45,22 +45,6 @@ defmodule Acai.SeedsTest do
   defp seeded_team, do: Repo.get_by!(Team, name: @seed_team_name)
   defp seeded_email(role), do: Map.fetch!(@seed_emails, role)
 
-  defp create_confirmed_user(email, password \\ "password123456") do
-    %User{}
-    |> User.email_changeset(%{email: email})
-    |> Repo.insert!()
-    |> User.password_changeset(%{password: password})
-    |> Repo.update!()
-    |> User.confirm_changeset()
-    |> Repo.update!()
-  end
-
-  defp create_access_token!(team, user, attrs) do
-    %AccessToken{team_id: team.id, user_id: user.id}
-    |> AccessToken.changeset(attrs)
-    |> Repo.insert!()
-  end
-
   # ============================================================================
   # USERS Tests
   # ============================================================================
@@ -160,74 +144,6 @@ defmodule Acai.SeedsTest do
       updated_developer = Accounts.get_user_by_email(seeded_email(:developer))
       assert updated_developer.confirmed_at != nil
     end
-
-    test "seed-data.ENVIRONMENT.2: renames legacy mapperoni seeded users in place" do
-      owner = Accounts.get_user_by_email(seeded_email(:owner))
-
-      {:ok, _updated_owner} =
-        owner
-        |> User.email_changeset(%{email: "owner@mapperoni.com"})
-        |> Repo.update()
-
-      refute Accounts.get_user_by_email(seeded_email(:owner))
-      assert Accounts.get_user_by_email("owner@mapperoni.com")
-
-      user_count_before = Repo.aggregate(User, :count)
-
-      Acai.Seeds.run(silent: true)
-
-      assert Accounts.get_user_by_email(seeded_email(:owner))
-      refute Accounts.get_user_by_email("owner@mapperoni.com")
-      assert user_count_before == Repo.aggregate(User, :count)
-    end
-
-    test "seed-data.ENVIRONMENT.2: removes duplicate legacy mapperoni users when canonical users already exist" do
-      legacy_owner = create_confirmed_user("owner@mapperoni.com")
-      legacy_developer = create_confirmed_user("developer@mapperoni.com")
-      _legacy_readonly = create_confirmed_user("readonly@mapperoni.com")
-      canonical_team = seeded_team()
-
-      Repo.insert!(%UserTeamRole{
-        team_id: canonical_team.id,
-        user_id: legacy_owner.id,
-        title: "owner"
-      })
-
-      create_access_token!(canonical_team, legacy_developer, %{
-        name: "Legacy Developer Token",
-        token_hash: Base.encode16(:crypto.hash(:sha256, "legacy-dev-token"), case: :lower),
-        token_prefix: "legacy-",
-        scopes: ["specs:read"]
-      })
-
-      assert Repo.aggregate(from(u in User, where: like(u.email, "%@example.com")), :count) == 3
-      assert Repo.aggregate(from(u in User, where: like(u.email, "%@mapperoni.com")), :count) == 3
-
-      Acai.Seeds.run(silent: true)
-
-      assert Repo.aggregate(from(u in User, where: like(u.email, "%@example.com")), :count) == 3
-      assert Repo.aggregate(from(u in User, where: like(u.email, "%@mapperoni.com")), :count) == 0
-
-      owner = Accounts.get_user_by_email(seeded_email(:owner))
-      developer = Accounts.get_user_by_email(seeded_email(:developer))
-      readonly = Accounts.get_user_by_email(seeded_email(:readonly))
-
-      assert Repo.get_by!(UserTeamRole, team_id: canonical_team.id, user_id: owner.id).title ==
-               "owner"
-
-      assert Repo.get_by!(UserTeamRole, team_id: canonical_team.id, user_id: developer.id).title ==
-               "developer"
-
-      assert Repo.get_by!(UserTeamRole, team_id: canonical_team.id, user_id: readonly.id).title ==
-               "readonly"
-
-      assert Repo.aggregate(from(t in AccessToken, where: t.user_id == ^owner.id), :count) == 1
-
-      assert Repo.aggregate(from(t in AccessToken, where: t.user_id == ^developer.id), :count) ==
-               3
-
-      assert Repo.aggregate(from(t in AccessToken, where: t.user_id == ^readonly.id), :count) == 0
-    end
   end
 
   # ============================================================================
@@ -251,43 +167,6 @@ defmodule Acai.SeedsTest do
       Acai.Seeds.run(silent: true)
       team_count_after = Repo.aggregate(Team, :count)
       assert team_count_before == team_count_after
-    end
-
-    test "seed-data.ENVIRONMENT.2: renames legacy mapperoni seeded team in place" do
-      team = seeded_team()
-      {:ok, _updated_team} = team |> Team.changeset(%{name: "mapperoni"}) |> Repo.update()
-
-      refute Repo.get_by(Team, name: @seed_team_name)
-      assert Repo.get_by(Team, name: "mapperoni")
-
-      team_count_before = Repo.aggregate(Team, :count)
-
-      Acai.Seeds.run(silent: true)
-
-      assert Repo.get_by(Team, name: @seed_team_name)
-      refute Repo.get_by(Team, name: "mapperoni")
-      assert team_count_before == Repo.aggregate(Team, :count)
-    end
-
-    test "seed-data.ENVIRONMENT.2: removes duplicate legacy mapperoni team when canonical team already exists" do
-      legacy_team = Repo.insert!(%Team{name: "mapperoni"})
-
-      legacy_product =
-        Repo.insert!(%Product{
-          team_id: legacy_team.id,
-          name: "legacy-product",
-          description: "legacy"
-        })
-
-      assert Repo.aggregate(from(t in Team, where: t.name == "example"), :count) == 1
-      assert Repo.aggregate(from(t in Team, where: t.name == "mapperoni"), :count) == 1
-      assert Repo.get(Product, legacy_product.id)
-
-      Acai.Seeds.run(silent: true)
-
-      assert Repo.aggregate(from(t in Team, where: t.name == "example"), :count) == 1
-      assert Repo.aggregate(from(t in Team, where: t.name == "mapperoni"), :count) == 0
-      refute Repo.get(Product, legacy_product.id)
     end
 
     test "seed-data.ENVIRONMENT.2: converges the example team to global_admin true on rerun" do
@@ -734,76 +613,6 @@ defmodule Acai.SeedsTest do
       Acai.Seeds.run(silent: true)
       branch_count_after = Repo.aggregate(TrackedBranch, :count)
       assert branch_count_before == branch_count_after
-    end
-
-    # seed-data.ENVIRONMENT.2: Convergence test for legacy api-backend tracked branches
-    test "seed-data.ENVIRONMENT.2: converges legacy api-backend tracked branches to backend" do
-      team = seeded_team()
-      product = Repo.get_by!(Product, team_id: team.id, name: "api")
-      impl = Repo.get_by!(Implementation, product_id: product.id, name: "Production")
-
-      # Simulate legacy state: create an api-backend tracked branch
-      legacy_branch =
-        Acai.Implementations.get_branch_by_identity(
-          team.id,
-          "github.com/mapperoni/api-backend",
-          "main"
-        ) ||
-          Acai.Repo.insert!(%Acai.Implementations.Branch{
-            team_id: team.id,
-            repo_uri: "github.com/mapperoni/api-backend",
-            branch_name: "main",
-            last_seen_commit: "legacy123"
-          })
-
-      # Create a legacy tracked branch
-      {:ok, _legacy_tb} =
-        Acai.Repo.insert(%Acai.Implementations.TrackedBranch{
-          implementation_id: impl.id,
-          branch_id: legacy_branch.id,
-          repo_uri: "github.com/mapperoni/api-backend"
-        })
-
-      # Verify legacy tracked branch exists
-      legacy_count_before =
-        Acai.Repo.aggregate(
-          from(tb in Acai.Implementations.TrackedBranch,
-            where:
-              tb.implementation_id == ^impl.id and
-                tb.repo_uri == "github.com/mapperoni/api-backend"
-          ),
-          :count
-        )
-
-      assert legacy_count_before == 1
-
-      # Re-run seeds to trigger convergence
-      Acai.Seeds.run(silent: true)
-
-      # Verify legacy tracked branch is removed
-      legacy_count_after =
-        Acai.Repo.aggregate(
-          from(tb in Acai.Implementations.TrackedBranch,
-            where:
-              tb.implementation_id == ^impl.id and
-                tb.repo_uri == "github.com/mapperoni/api-backend"
-          ),
-          :count
-        )
-
-      assert legacy_count_after == 0
-
-      # Verify canonical tracked branch exists
-      canonical_count =
-        Acai.Repo.aggregate(
-          from(tb in Acai.Implementations.TrackedBranch,
-            where:
-              tb.implementation_id == ^impl.id and tb.repo_uri == "github.com/mapperoni/backend"
-          ),
-          :count
-        )
-
-      assert canonical_count == 1
     end
   end
 

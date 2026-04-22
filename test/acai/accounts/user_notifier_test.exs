@@ -10,7 +10,7 @@ defmodule Acai.Accounts.UserNotifierTest do
     previous_email = Application.get_env(:acai, :mail_from_email)
 
     Application.put_env(:acai, :mail_from_name, "Acai")
-    Application.put_env(:acai, :mail_from_email, "noreply@acai.sh")
+    Application.put_env(:acai, :mail_from_email, "noreply@example.com")
 
     on_exit(fn ->
       if is_nil(previous_name) do
@@ -31,12 +31,12 @@ defmodule Acai.Accounts.UserNotifierTest do
 
   test "uses sender identity from app config" do
     Application.put_env(:acai, :mail_from_name, "Acai Team")
-    Application.put_env(:acai, :mail_from_email, "hello@acai.sh")
+    Application.put_env(:acai, :mail_from_email, "hello@example.com")
 
     {:ok, email} =
       UserNotifier.deliver_update_email_instructions(user_fixture(), "https://example.com")
 
-    assert email.from == {"Acai Team", "hello@acai.sh"}
+    assert email.from == {"Acai Team", "hello@example.com"}
   end
 
   test "renders branded login text and HTML" do

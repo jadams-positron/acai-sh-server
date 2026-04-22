@@ -32,12 +32,6 @@ defmodule Acai.Seeds do
   @seed_team_name "example"
   @seed_user_emails ["owner@example.com", "developer@example.com", "readonly@example.com"]
 
-  @legacy_seed_identity_mappings [
-    {"owner@mapperoni.com", "owner@example.com"},
-    {"developer@mapperoni.com", "developer@example.com"},
-    {"readonly@mapperoni.com", "readonly@example.com"}
-  ]
-
   # Deterministic raw tokens for idempotent token generation
   @seeded_tokens [
     # seed-data.TOKENS.1: developer has 3 access tokens
@@ -768,8 +762,6 @@ defmodule Acai.Seeds do
     # seed-data.ENVIRONMENT.1: Seed data runs automatically during devcontainer build
     # seed-data.ENVIRONMENT.2: Seeding must be idempotent
 
-    converge_legacy_seed_identities(silent)
-
     users = seed_users(silent)
     team = seed_team(@seed_team_name, silent)
     seed_roles(team, users, silent)
@@ -909,75 +901,6 @@ defmodule Acai.Seeds do
   # ---------------------------------------------------------------------------
   # Team Seeding
   # ---------------------------------------------------------------------------
-
-  # Renames legacy mapperoni seed identities in place so re-running the renamed
-  # seed implementation converges prior seeded data instead of creating a second
-  # parallel seed set. seed-data.ENVIRONMENT.2
-  defp converge_legacy_seed_identities(silent) do
-    Enum.each(@legacy_seed_identity_mappings, fn {legacy_email, canonical_email} ->
-      converge_legacy_user_email(legacy_email, canonical_email, silent)
-    end)
-
-    converge_legacy_team_name("mapperoni", @seed_team_name, silent)
-  end
-
-  defp converge_legacy_user_email(legacy_email, canonical_email, silent) do
-    legacy_user = Accounts.get_user_by_email(legacy_email)
-    canonical_user = Accounts.get_user_by_email(canonical_email)
-
-    cond do
-      legacy_user && is_nil(canonical_user) ->
-        {:ok, _updated_user} =
-          legacy_user
-          |> User.email_changeset(%{email: canonical_email})
-          |> Repo.update()
-
-        unless silent do
-          IO.puts("Renamed legacy seeded user: #{legacy_email} -> #{canonical_email}")
-        end
-
-      legacy_user && canonical_user ->
-        Repo.delete!(legacy_user)
-
-        unless silent do
-          IO.puts(
-            "Removed duplicate legacy seeded user: #{legacy_email} (canonical #{canonical_email} already exists)"
-          )
-        end
-
-      true ->
-        :ok
-    end
-  end
-
-  defp converge_legacy_team_name(legacy_name, canonical_name, silent) do
-    legacy_team = Repo.get_by(Team, name: legacy_name)
-    canonical_team = Repo.get_by(Team, name: canonical_name)
-
-    cond do
-      legacy_team && is_nil(canonical_team) ->
-        {:ok, _updated_team} =
-          legacy_team
-          |> Team.changeset(%{name: canonical_name})
-          |> Repo.update()
-
-        unless silent do
-          IO.puts("Renamed legacy seeded team: #{legacy_name} -> #{canonical_name}")
-        end
-
-      legacy_team && canonical_team ->
-        Repo.delete!(legacy_team)
-
-        unless silent do
-          IO.puts(
-            "Removed duplicate legacy seeded team: #{legacy_name} (canonical #{canonical_name} already exists)"
-          )
-        end
-
-      true ->
-        :ok
-    end
-  end
 
   defp seed_team(name, silent) do
     unless silent do
@@ -1386,9 +1309,6 @@ defmodule Acai.Seeds do
     # API Production: backend/main (same branch as API specs/refs)
     seed_tracked_branch(impl, branches.api_backend_main, silent)
 
-    # Clean up legacy api-backend tracked branch for convergence
-    cleanup_legacy_api_tracked_branch(impl, silent)
-
     impl
   end
 
@@ -1407,34 +1327,7 @@ defmodule Acai.Seeds do
     # API Staging: backend/dev (same branch as API specs/refs)
     seed_tracked_branch(impl, branches.api_backend_dev, silent)
 
-    # Clean up legacy api-backend tracked branch for convergence
-    cleanup_legacy_api_tracked_branch(impl, silent)
-
     impl
-  end
-
-  # ---------------------------------------------------------------------------
-  # Legacy API Tracked Branch Cleanup
-  # ---------------------------------------------------------------------------
-
-  # Removes legacy api-backend tracked branches for convergence
-  # seed-data.ENVIRONMENT.2: Re-running seeds repairs previously seeded data
-  defp cleanup_legacy_api_tracked_branch(impl, silent) do
-    legacy_repo_uri = "github.com/mapperoni/api-backend"
-
-    legacy_tracked_branches =
-      Repo.all(
-        from tb in TrackedBranch,
-          where: tb.implementation_id == ^impl.id and tb.repo_uri == ^legacy_repo_uri
-      )
-
-    Enum.each(legacy_tracked_branches, fn legacy_tb ->
-      Repo.delete!(legacy_tb)
-
-      unless silent do
-        IO.puts("Removed legacy tracked branch: #{legacy_repo_uri} for #{impl.name}")
-      end
-    end)
   end
 
   # ---------------------------------------------------------------------------

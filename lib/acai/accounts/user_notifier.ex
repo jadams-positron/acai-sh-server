@@ -6,7 +6,7 @@ defmodule Acai.Accounts.UserNotifier do
 
   defp deliver(recipient, subject, text_body, html_body) do
     from_name = Application.get_env(:acai, :mail_from_name, "Acai")
-    from_email = Application.get_env(:acai, :mail_from_email, "noreply@acai.sh")
+    from_email = Application.get_env(:acai, :mail_from_email, "noreply@example.com")
 
     email =
       new()
