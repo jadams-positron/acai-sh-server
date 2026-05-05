@@ -5,7 +5,11 @@ version: "2"
 
 run:
   timeout: 5m
-  go: "1.26"
+  # NOTE: pinned to 1.24 because pre-built golangci-lint v2 binaries are
+  # currently built with Go 1.24; they refuse to analyze code targeting a
+  # higher Go version. go.mod still declares go 1.26 — this only constrains
+  # what syntax features the linter will recognize.
+  go: "1.24"
   tests: true
   modules-download-mode: readonly
 
