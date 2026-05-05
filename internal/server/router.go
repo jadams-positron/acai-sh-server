@@ -25,7 +25,7 @@ func newRouter(deps *RouterDeps) chi.Router {
 		r.Use(auth.LoadScope(deps.Sessions, deps.Accounts))
 
 		site.MountAuthRoutes(r, deps.AuthHandlerDeps, deps.CSRFKey, deps.SecureCookie)
-		site.MountAuthRequiredStub(r)
+		site.MountAuthRequiredStub(r, deps.CSRFKey, deps.SecureCookie)
 	})
 
 	// Health check is outside the session middleware.
