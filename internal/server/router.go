@@ -7,6 +7,7 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/ops"
 	"github.com/jadams-positron/acai-sh-server/internal/site"
+	"github.com/jadams-positron/acai-sh-server/internal/site/handlers"
 )
 
 // newRouter builds the chi router with auth + site routes mounted.
@@ -14,6 +15,9 @@ func newRouter(deps *RouterDeps) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
+
+	// Static assets are public — mount before session-loaded group.
+	handlers.MountStatic(r)
 
 	// Browser routes get sessions + scope.
 	r.Group(func(r chi.Router) {
