@@ -16,6 +16,7 @@ type Querier interface {
 	GetEmailTokenByHashAndContext(ctx context.Context, arg GetEmailTokenByHashAndContextParams) (EmailToken, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
+	MarkUserConfirmed(ctx context.Context, arg MarkUserConfirmedParams) error
 	// Ping returns 1 if the DB is reachable. Used by /_health.
 	Ping(ctx context.Context) (int64, error)
 	UpdateUserConfirmedAt(ctx context.Context, arg UpdateUserConfirmedAtParams) error

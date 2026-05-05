@@ -11,3 +11,8 @@ SELECT * FROM users WHERE id = ? LIMIT 1;
 
 -- name: UpdateUserConfirmedAt :exec
 UPDATE users SET confirmed_at=?, updated_at=? WHERE id=?;
+
+-- name: MarkUserConfirmed :exec
+UPDATE users
+SET confirmed_at = ?, updated_at = ?
+WHERE id = ? AND confirmed_at IS NULL;
