@@ -8,7 +8,7 @@ import (
 	"github.com/alexedwards/scs/sqlite3store"
 	"github.com/alexedwards/scs/v2"
 
-	"github.com/acai-sh/server/internal/store"
+	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
 // SessionLifetime is how long a session cookie persists if remember-me is set.

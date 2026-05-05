@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/acai-sh/server/internal/domain/accounts"
-	"github.com/acai-sh/server/internal/store"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
 func newRepo(t *testing.T) *accounts.Repository {

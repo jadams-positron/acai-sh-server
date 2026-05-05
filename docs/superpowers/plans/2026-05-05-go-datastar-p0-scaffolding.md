@@ -4,7 +4,7 @@
 
 **Goal:** Stand up an empty Go project on a dedicated branch with CI green, JSON-formatted slog wired up, a Makefile that mirrors the existing `mix precommit` discipline, and the current Phoenix `/api/v1/openapi.json` captured as a golden file for use in Phase 2's API parity work.
 
-**Architecture:** Pure-Go module rooted at `github.com/acai-sh/server`. Single `cmd/acai` binary entrypoint. Two `internal/` packages in this phase: `internal/config` (env → typed config) and `internal/ops` (slog setup). Build/test/lint orchestrated by `make`. CI runs the same Makefile targets via GitHub Actions.
+**Architecture:** Pure-Go module rooted at `github.com/jadams-positron/acai-sh-server`. Single `cmd/acai` binary entrypoint. Two `internal/` packages in this phase: `internal/config` (env → typed config) and `internal/ops` (slog setup). Build/test/lint orchestrated by `make`. CI runs the same Makefile targets via GitHub Actions.
 
 **Tech Stack:** Go 1.22, `log/slog` (stdlib), `golangci-lint`, GitHub Actions. No third-party Go dependencies in P0.
 
@@ -96,13 +96,13 @@ Expected: `go version go1.22.x ...` or higher. If not installed, install Go 1.22
 - [ ] **Step 2: Initialize module**
 
 ```bash
-go mod init github.com/acai-sh/server
+go mod init github.com/jadams-positron/acai-sh-server
 ```
 
 Expected: a new `go.mod` file created with:
 
 ```
-module github.com/acai-sh/server
+module github.com/jadams-positron/acai-sh-server
 
 go 1.22
 ```
@@ -119,7 +119,7 @@ Expected: no output, exit 0 (no Go files to compile yet, but the module is valid
 
 ```bash
 git add go.mod
-git commit -m "chore(p0): initialize Go module github.com/acai-sh/server"
+git commit -m "chore(p0): initialize Go module github.com/jadams-positron/acai-sh-server"
 ```
 
 ---
@@ -237,7 +237,7 @@ func printVersion(w io.Writer, v string) {
 go test ./cmd/acai/...
 ```
 
-Expected: `ok  	github.com/acai-sh/server/cmd/acai	0.0XXs`.
+Expected: `ok  	github.com/jadams-positron/acai-sh-server/cmd/acai	0.0XXs`.
 
 - [ ] **Step 5: Verify the binary runs end-to-end**
 
@@ -280,7 +280,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/acai-sh/server/internal/config"
+	"github.com/jadams-positron/acai-sh-server/internal/config"
 )
 
 func TestLoad_DefaultsWhenEnvMissing(t *testing.T) {
@@ -377,7 +377,7 @@ func getenvDefault(key, fallback string) string {
 go test ./internal/config/...
 ```
 
-Expected: `ok  	github.com/acai-sh/server/internal/config	0.00Xs`.
+Expected: `ok  	github.com/jadams-positron/acai-sh-server/internal/config	0.00Xs`.
 
 - [ ] **Step 5: Commit**
 
@@ -410,8 +410,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acai-sh/server/internal/config"
-	"github.com/acai-sh/server/internal/ops"
+	"github.com/jadams-positron/acai-sh-server/internal/config"
+	"github.com/jadams-positron/acai-sh-server/internal/ops"
 )
 
 func TestSetupLogger_EmitsValidJSON(t *testing.T) {
@@ -493,7 +493,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/acai-sh/server/internal/config"
+	"github.com/jadams-positron/acai-sh-server/internal/config"
 )
 
 // SetupLogger returns a *slog.Logger configured with slog.NewJSONHandler

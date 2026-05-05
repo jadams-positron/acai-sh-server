@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/acai-sh/server/internal/store"
+	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
 func TestOpen_CreatesFile(t *testing.T) {

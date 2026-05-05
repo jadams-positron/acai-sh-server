@@ -11,7 +11,7 @@ defmodule Acai.Implementations.BranchTest do
       team = team_fixture()
 
       attrs = %{
-        repo_uri: "github.com/acai-sh/server",
+        repo_uri: "github.com/jadams-positron/acai-sh-server",
         branch_name: "main",
         last_seen_commit: "abc123def456789",
         team_id: team.id
@@ -45,7 +45,7 @@ defmodule Acai.Implementations.BranchTest do
       team = team_fixture()
 
       attrs = %{
-        repo_uri: "github.com/acai-sh/server",
+        repo_uri: "github.com/jadams-positron/acai-sh-server",
         branch_name: "main",
         last_seen_commit: "a" |> String.duplicate(40),
         team_id: team.id
@@ -62,7 +62,7 @@ defmodule Acai.Implementations.BranchTest do
       team = team_fixture()
 
       attrs = %{
-        repo_uri: "github.com/acai-sh/server",
+        repo_uri: "github.com/jadams-positron/acai-sh-server",
         branch_name: "main",
         last_seen_commit: "abc123def456789",
         team_id: team.id
@@ -85,7 +85,7 @@ defmodule Acai.Implementations.BranchTest do
       team = team_fixture()
 
       attrs = %{
-        repo_uri: "github.com/acai-sh/server",
+        repo_uri: "github.com/jadams-positron/acai-sh-server",
         branch_name: "main",
         last_seen_commit: "abc123def456789",
         team_id: team.id
@@ -104,7 +104,7 @@ defmodule Acai.Implementations.BranchTest do
       team = team_fixture()
 
       attrs = %{
-        repo_uri: "github.com/acai-sh/server",
+        repo_uri: "github.com/jadams-positron/acai-sh-server",
         branch_name: "main",
         last_seen_commit: "abc123def456789",
         team_id: team.id
@@ -124,14 +124,14 @@ defmodule Acai.Implementations.BranchTest do
       team2 = team_fixture()
 
       attrs1 = %{
-        repo_uri: "github.com/acai-sh/server",
+        repo_uri: "github.com/jadams-positron/acai-sh-server",
         branch_name: "main",
         last_seen_commit: "abc123def456789",
         team_id: team1.id
       }
 
       attrs2 = %{
-        repo_uri: "github.com/acai-sh/server",
+        repo_uri: "github.com/jadams-positron/acai-sh-server",
         branch_name: "main",
         last_seen_commit: "abc123def456789",
         team_id: team2.id

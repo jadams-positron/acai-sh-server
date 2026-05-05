@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/acai-sh/server/internal/store"
+	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
 // healthResponse is the JSON payload returned by /_health.

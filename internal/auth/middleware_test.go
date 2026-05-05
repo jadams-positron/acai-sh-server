@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/acai-sh/server/internal/auth"
-	"github.com/acai-sh/server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
 )
 
 func TestRequireAuth_RedirectsAnonymous(t *testing.T) {

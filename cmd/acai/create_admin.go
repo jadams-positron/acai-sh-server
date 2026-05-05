@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/acai-sh/server/internal/auth"
-	"github.com/acai-sh/server/internal/config"
-	"github.com/acai-sh/server/internal/domain/accounts"
-	"github.com/acai-sh/server/internal/ops"
-	"github.com/acai-sh/server/internal/store"
+	"github.com/jadams-positron/acai-sh-server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/config"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/ops"
+	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
 // runCreateAdmin parses --email + optional --password, opens the DB, runs

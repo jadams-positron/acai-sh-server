@@ -13,10 +13,10 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 
-	"github.com/acai-sh/server/internal/config"
-	"github.com/acai-sh/server/internal/domain/accounts"
-	"github.com/acai-sh/server/internal/site/handlers"
-	"github.com/acai-sh/server/internal/store"
+	"github.com/jadams-positron/acai-sh-server/internal/config"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/site/handlers"
+	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
 // RouterDeps groups everything newRouter needs.

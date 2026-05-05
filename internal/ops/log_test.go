@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acai-sh/server/internal/config"
-	"github.com/acai-sh/server/internal/ops"
+	"github.com/jadams-positron/acai-sh-server/internal/config"
+	"github.com/jadams-positron/acai-sh-server/internal/ops"
 )
 
 func TestSetupLogger_EmitsValidJSON(t *testing.T) {

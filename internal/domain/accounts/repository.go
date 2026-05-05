@@ -12,8 +12,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/acai-sh/server/internal/store"
-	"github.com/acai-sh/server/internal/store/sqlc"
+	"github.com/jadams-positron/acai-sh-server/internal/store"
+	"github.com/jadams-positron/acai-sh-server/internal/store/sqlc"
 )
 
 // ErrNotFound is returned by Repository methods when a requested record does

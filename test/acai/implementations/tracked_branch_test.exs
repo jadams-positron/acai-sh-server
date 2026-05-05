@@ -6,7 +6,7 @@ defmodule Acai.Implementations.TrackedBranchTest do
   alias Acai.Implementations.TrackedBranch
 
   @valid_attrs %{
-    repo_uri: "github.com/acai-sh/server"
+    repo_uri: "github.com/jadams-positron/acai-sh-server"
   }
 
   describe "changeset/2" do
@@ -49,18 +49,18 @@ defmodule Acai.Implementations.TrackedBranchTest do
       team = team_fixture()
       product = product_fixture(team)
       impl = implementation_fixture(product)
-      branch1 = branch_fixture(%{repo_uri: "github.com/acai-sh/server"})
-      branch2 = branch_fixture(%{repo_uri: "github.com/acai-sh/server", branch_name: "develop"})
+      branch1 = branch_fixture(%{repo_uri: "github.com/jadams-positron/acai-sh-server"})
+      branch2 = branch_fixture(%{repo_uri: "github.com/jadams-positron/acai-sh-server", branch_name: "develop"})
 
       # First tracked branch should succeed
-      tracked_branch_fixture(impl, %{branch: branch1, repo_uri: "github.com/acai-sh/server"})
+      tracked_branch_fixture(impl, %{branch: branch1, repo_uri: "github.com/jadams-positron/acai-sh-server"})
 
       # Second tracked branch with same implementation and repo_uri should fail
       attrs =
         @valid_attrs
         |> Map.put(:implementation_id, impl.id)
         |> Map.put(:branch_id, branch2.id)
-        |> Map.put(:repo_uri, "github.com/acai-sh/server")
+        |> Map.put(:repo_uri, "github.com/jadams-positron/acai-sh-server")
 
       {:error, cs} =
         TrackedBranch.changeset(%TrackedBranch{}, attrs)

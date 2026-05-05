@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 
-	"github.com/acai-sh/server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
 )
 
 // Scope is the auth carrier threaded through the request lifecycle. nil User
