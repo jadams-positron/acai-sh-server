@@ -1,3 +1,3 @@
 module github.com/acai-sh/server
 
-go 1.22
+go 1.26
