@@ -1,0 +1,54 @@
+# .github/workflows/ci.yml
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+      - rewrite/**
+  pull_request:
+    branches:
+      - main
+      - rewrite/**
+
+jobs:
+  go:
+    name: Go (lint + test + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Verify go.mod is tidy
+        run: |
+          go mod tidy
+          if [ -n "$(git status --porcelain go.mod go.sum)" ]; then
+            echo "go.mod or go.sum is not tidy. Run 'go mod tidy' locally."
+            git diff -- go.mod go.sum
+            exit 1
+          fi
+
+      - name: Vet
+        run: make vet
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v2.0
+          args: --timeout=3m
+
+      - name: Test
+        run: make test
+
+      - name: Build
+        run: make build
+
+      - name: Verify binary runs
+        run: ./acai version
