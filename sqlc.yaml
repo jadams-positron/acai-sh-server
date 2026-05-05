@@ -1,0 +1,14 @@
+version: "2"
+
+sql:
+  - engine: sqlite
+    queries: internal/store/queries/
+    schema: internal/store/migrations/
+    gen:
+      go:
+        out: internal/store/sqlc
+        package: sqlc
+        sql_package: database/sql
+        emit_interface: true
+        emit_pointers_for_null_types: true
+        emit_empty_slices: true
