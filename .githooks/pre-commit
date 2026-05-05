@@ -1,0 +1,28 @@
+#!/bin/sh
+# Project pre-commit hook. Runs `just precommit` (fmt -> fix -> vet -> lint -> test).
+#
+# Activated by setting `core.hooksPath` to `.githooks/`:
+#     just init-hooks
+#
+# To bypass once (NOT recommended): git commit --no-verify
+
+set -e
+
+if ! command -v just >/dev/null 2>&1; then
+  echo "pre-commit: 'just' is not installed. See https://github.com/casey/just#installation"
+  echo "  Skipping pre-commit checks. Install 'just' to enable."
+  exit 0
+fi
+
+# Run the full precommit pipeline. The pipeline includes formatters that mutate
+# files (gofmt, go fix); if anything changed, abort the commit so the user
+# can stage and re-commit.
+just precommit
+
+if ! git diff --quiet; then
+  echo
+  echo "pre-commit: files were modified by 'just fmt' or 'just fix'."
+  echo "Stage the changes and re-run the commit:"
+  echo "    git add -A && git commit"
+  exit 1
+fi
