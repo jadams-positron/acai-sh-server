@@ -107,3 +107,50 @@ func TestRepository_ConsumeEmailToken_RejectsExpired(t *testing.T) {
 		t.Fatal("expected error for expired token, got nil")
 	}
 }
+
+func TestRepository_MarkConfirmed_SetsTimestampOnce(t *testing.T) {
+	repo := newRepo(t)
+	ctx := context.Background()
+
+	u, err := repo.CreateUser(ctx, accounts.CreateUserParams{Email: "dan@example.com"})
+	if err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	if u.ConfirmedAt != nil {
+		t.Fatalf("expected ConfirmedAt nil after creation, got %v", u.ConfirmedAt)
+	}
+
+	// First call: should set confirmed_at.
+	if err := repo.MarkConfirmed(ctx, u.ID); err != nil {
+		t.Fatalf("MarkConfirmed (first): %v", err)
+	}
+
+	confirmed, err := repo.GetUserByID(ctx, u.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID after first MarkConfirmed: %v", err)
+	}
+	if confirmed.ConfirmedAt == nil {
+		t.Fatal("expected ConfirmedAt to be set after MarkConfirmed, got nil")
+	}
+	firstTimestamp := *confirmed.ConfirmedAt
+
+	// Brief pause so that if the second call wrote, the timestamp would differ.
+	time.Sleep(50 * time.Millisecond)
+
+	// Second call: idempotent — confirmed_at IS NULL filter prevents update.
+	if err := repo.MarkConfirmed(ctx, u.ID); err != nil {
+		t.Fatalf("MarkConfirmed (second): %v", err)
+	}
+
+	confirmed2, err := repo.GetUserByID(ctx, u.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID after second MarkConfirmed: %v", err)
+	}
+	if confirmed2.ConfirmedAt == nil {
+		t.Fatal("expected ConfirmedAt to still be set after idempotent MarkConfirmed")
+	}
+	if !confirmed2.ConfirmedAt.Equal(firstTimestamp) {
+		t.Errorf("MarkConfirmed is not idempotent: timestamp changed from %v to %v",
+			firstTimestamp, *confirmed2.ConfirmedAt)
+	}
+}

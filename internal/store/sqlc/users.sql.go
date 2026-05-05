@@ -81,6 +81,23 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
 	return i, err
 }
 
+const markUserConfirmed = `-- name: MarkUserConfirmed :exec
+UPDATE users
+SET confirmed_at = ?, updated_at = ?
+WHERE id = ? AND confirmed_at IS NULL
+`
+
+type MarkUserConfirmedParams struct {
+	ConfirmedAt *string
+	UpdatedAt   string
+	ID          string
+}
+
+func (q *Queries) MarkUserConfirmed(ctx context.Context, arg MarkUserConfirmedParams) error {
+	_, err := q.db.ExecContext(ctx, markUserConfirmed, arg.ConfirmedAt, arg.UpdatedAt, arg.ID)
+	return err
+}
+
 const updateUserConfirmedAt = `-- name: UpdateUserConfirmedAt :exec
 UPDATE users SET confirmed_at=?, updated_at=? WHERE id=?
 `

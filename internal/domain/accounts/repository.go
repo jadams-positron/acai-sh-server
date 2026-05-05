@@ -181,6 +181,22 @@ func (r *Repository) ConsumeEmailToken(ctx context.Context, rawToken, tokenConte
 	return user, nil
 }
 
+// MarkConfirmed sets users.confirmed_at to now() iff it was previously NULL.
+// Idempotent — re-confirming a confirmed user is a no-op (the SQL filters
+// on `confirmed_at IS NULL`).
+func (r *Repository) MarkConfirmed(ctx context.Context, userID string) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	q := sqlc.New(r.db.Write)
+	if err := q.MarkUserConfirmed(ctx, sqlc.MarkUserConfirmedParams{
+		ConfirmedAt: &now,
+		UpdatedAt:   now,
+		ID:          userID,
+	}); err != nil {
+		return fmt.Errorf("accounts: MarkConfirmed: %w", err)
+	}
+	return nil
+}
+
 // userFromRow maps a sqlc.User row to the domain User type.
 func userFromRow(row sqlc.User) (*User, error) {
 	insertedAt, err := time.Parse(time.RFC3339Nano, row.InsertedAt)
