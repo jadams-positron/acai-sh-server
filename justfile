@@ -63,6 +63,11 @@ init-hooks:
     git config core.hooksPath .githooks
     @echo "core.hooksPath set to .githooks. Hooks will run on git commit."
 
+# Run code generators (sqlc). Run this whenever queries/ or migrations/ change.
+gen:
+    sqlc generate
+    @echo "gen: sqlc done."
+
 # Remove built artifacts.
 clean:
     rm -f acai coverage.txt coverage.html
