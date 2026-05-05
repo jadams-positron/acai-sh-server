@@ -10,6 +10,30 @@ import (
 	"testing"
 )
 
+func TestRun_CreateAdminSubcommand(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "test.db")
+
+	t.Setenv("DATABASE_PATH", dbPath)
+	t.Setenv("HTTP_PORT", "4000")
+	t.Setenv("LOG_LEVEL", "warn")
+	t.Setenv("SECRET_KEY_BASE", strings.Repeat("a", 32)+"-test-secret-key-base")
+	t.Setenv("MAIL_NOOP", "true")
+	t.Setenv("URL_HOST", "localhost")
+	t.Setenv("URL_SCHEME", "http")
+
+	var stdout, stderr bytes.Buffer
+	code := run(context.Background(), []string{
+		"acai", "create-admin", "--email", "first@example.com", "--password", "secret-password-12345",
+	}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("create-admin exit = %d; stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "first@example.com") {
+		t.Errorf("stdout missing email; got %q", stdout.String())
+	}
+}
+
 func TestPrintVersion_WritesNonEmptyVersion(t *testing.T) {
 	var buf bytes.Buffer
 	printVersion(&buf, "0.0.0-dev")
