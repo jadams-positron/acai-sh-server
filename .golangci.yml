@@ -129,6 +129,18 @@ linters:
           - revive
           - unparam
 
+      # templ-generated files (_templ.go) contain patterns that trip linters.
+      # The generator is authoritative; we don't lint generated output.
+      - path: internal/site/views/.*_templ\.go
+        linters:
+          - errcheck
+          - revive
+          - unparam
+          - gosec
+          - dupword
+          - gocritic
+          - staticcheck
+
 formatters:
   enable:
     - gofmt
