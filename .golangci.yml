@@ -1,44 +1,141 @@
-# .golangci.yml — baseline lint config for the Go rewrite.
-# See https://golangci-lint.run/usage/configuration/ for the full schema.
-#
-# NOTE: written for golangci-lint v2 (installed: v2.12.1).
-# The original spec used v1 syntax; keys have been mapped to their v2
-# equivalents while preserving identical linter selection and exclusion intent.
+# .golangci.yml — robust, opinionated lint config for the Acai Go rewrite.
+# golangci-lint v2.x. See https://golangci-lint.run/usage/configuration/.
 
 version: "2"
 
 run:
-  timeout: 3m
+  timeout: 5m
   go: "1.26"
   tests: true
   modules-download-mode: readonly
 
 linters:
-  default: none   # v2 equivalent of v1 disable-all: true
+  default: none
   enable:
-    - errcheck       # unchecked errors
-    # gosimple absorbed into staticcheck in v2; no separate entry needed
-    - govet          # `go vet` rules
-    - ineffassign    # ineffectual assignments
-    - staticcheck    # broad static analysis
-    # typecheck is always-on in v2; cannot be listed here
-    - unused         # unused code (functions, types, vars)
-    - misspell       # spelling
-    - bodyclose      # http response body closed
-    - errorlint      # error wrapping correctness
-    - nolintlint     # no naked //nolint without explanation
+    # --- correctness ---
+    - errcheck                       # unchecked errors
+    - errorlint                      # error wrapping correctness
+    - govet                          # `go vet` rules
+    - ineffassign                    # ineffectual assignments
+    - nilerr                         # wrong nil error returns
+    - rowserrcheck                   # sql.Rows.Err() not checked
+    - sqlclosecheck                  # sql.Rows/Stmt closed
+    - staticcheck                    # broad static analysis (absorbs gosimple, stylecheck)
+    - unused                         # unused code (functions, types, vars)
+    - bodyclose                      # http response body closed
+    - noctx                          # http requests missing context.Context
+    - wastedassign                   # wasted variable assignments
+    - gocheckcompilerdirectives      # // go: directives correctness
 
-  settings:   # v2 equivalent of v1 linters-settings
+    # --- style / readability ---
+    - gocritic                       # opinionated style/perf checks
+    - misspell                       # spelling
+    - nolintlint                     # disallow naked //nolint without explanation
+    - predeclared                    # no shadowing of predeclared identifiers
+    - revive                         # replacement for golint, configurable
+    - unconvert                      # unnecessary type conversions
+    - unparam                        # unused function parameters
+    - whitespace                     # leading/trailing whitespace problems
+    - dupword                        # duplicate words in strings/comments
+
+    # --- performance ---
+    - prealloc                       # slice preallocation suggestions
+
+    # --- security ---
+    - gosec                          # security issues
+
+    # --- testing ---
+    - tparallel                      # t.Parallel() correctness in tests
+
+  settings:
     errcheck:
       check-type-assertions: true
-      check-blank: false
+      check-blank: false             # allow `_, _ = fmt.Fprintln(w, ...)` discards
+
     misspell:
       locale: US
 
-  exclusions:   # v2 equivalent of v1 issues.exclude-* keys
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - whyNoLint                  # noisy; nolintlint already handles this
+        - paramTypeCombine           # stylistic, not always desirable
+        - hugeParam                  # too many false positives on real-world structs
+
+    revive:
+      severity: warning
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: early-return
+        - name: empty-block
+        - name: empty-lines
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: exported
+          arguments:
+            - "checkPrivateReceivers"
+            - "sayRepetitiveInsteadOfStutters"
+        - name: if-return
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: unreachable-code
+        - name: unused-parameter
+        - name: var-declaration
+        - name: var-naming
+
+    gosec:
+      excludes:
+        - G104                       # errcheck handles unchecked errors
+        - G306                       # file-write perms (project-specific)
+        - G115                       # int conversion overflow (noisy on small Go projects)
+
+    staticcheck:
+      checks:
+        - all
+        - -SA1019                    # tolerate deprecated stdlib usage temporarily; revisit per occurrence
+
+    unparam:
+      check-exported: false          # exported APIs may have intentionally-unused params
+
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+
+  exclusions:
     generated: lax
-    presets: []   # v2 equivalent of v1 exclude-use-default: false
+    presets: []
     rules:
+      # tests legitimately discard returns from t.Setenv etc.
       - path: _test\.go
         linters:
-          - errcheck   # tests legitimately discard returns from t.Setenv etc.
+          - errcheck
+          - gosec
+          - revive
+          - unparam
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: true
+    goimports:
+      local-prefixes:
+        - github.com/acai-sh/server
