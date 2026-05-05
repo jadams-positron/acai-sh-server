@@ -35,8 +35,11 @@ jobs:
             exit 1
           fi
 
+      - name: Install just
+        uses: extractions/setup-just@v2
+
       - name: Vet
-        run: make vet
+        run: just vet
 
       - name: Lint
         uses: golangci/golangci-lint-action@v6
@@ -45,10 +48,10 @@ jobs:
           args: --timeout=3m
 
       - name: Test
-        run: make test
+        run: just test
 
       - name: Build
-        run: make build
+        run: just build
 
       - name: Verify binary runs
         run: ./acai version
