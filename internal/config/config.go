@@ -1,17 +1,23 @@
 // Package config loads runtime configuration from environment variables.
 //
-// In Phase 0 the only field is LogLevel. Subsequent phases extend this struct
-// (database path, http port, mailer settings, etc.) — keep additions
-// alphabetically sorted within each section.
+// Fields are populated by Load and alphabetically sorted within each section.
+// P0 adds LogLevel; P1a adds DatabasePath and HTTPPort.
 package config
 
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 // Config is the validated runtime configuration. All fields are populated by Load.
 type Config struct {
+	// DatabasePath is the path to the SQLite database file. Default: "./acai.db".
+	DatabasePath string
+
+	// HTTPPort is the TCP port the HTTP server listens on. Range [1, 65535]. Default: 4000.
+	HTTPPort int
+
 	// LogLevel is one of "debug", "info", "warn", "error". Default: "info".
 	LogLevel string
 }
@@ -20,8 +26,21 @@ type Config struct {
 // Returns an error if any value fails validation.
 func Load() (*Config, error) {
 	cfg := &Config{
-		LogLevel: getenvDefault("LOG_LEVEL", "info"),
+		DatabasePath: getenvDefault("DATABASE_PATH", "./acai.db"),
+		LogLevel:     getenvDefault("LOG_LEVEL", "info"),
 	}
+
+	// HTTP_PORT
+	portStr := getenvDefault("HTTP_PORT", "4000")
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return nil, fmt.Errorf("config: invalid HTTP_PORT %q: not an integer", portStr)
+	}
+	if port < 1 || port > 65535 {
+		return nil, fmt.Errorf("config: invalid HTTP_PORT %d: must be in range [1, 65535]", port)
+	}
+	cfg.HTTPPort = port
+
 	switch cfg.LogLevel {
 	case "debug", "info", "warn", "error":
 		// ok
