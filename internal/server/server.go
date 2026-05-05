@@ -1,3 +1,4 @@
+// Package server owns the HTTP listener and chi router lifecycle.
 package server
 
 import (
@@ -10,11 +11,26 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alexedwards/scs/v2"
+
 	"github.com/acai-sh/server/internal/config"
+	"github.com/acai-sh/server/internal/domain/accounts"
+	"github.com/acai-sh/server/internal/site/handlers"
 	"github.com/acai-sh/server/internal/store"
 )
 
-// Server is the HTTP server for the Acai service.
+// RouterDeps groups everything newRouter needs.
+type RouterDeps struct {
+	DB              *store.DB
+	Sessions        *scs.SessionManager
+	Accounts        *accounts.Repository
+	AuthHandlerDeps *handlers.AuthDeps
+	CSRFKey         []byte
+	SecureCookie    bool
+	Version         string
+}
+
+// Server is the HTTP server bundle.
 type Server struct {
 	cfg     *config.Config
 	logger  *slog.Logger
@@ -23,21 +39,21 @@ type Server struct {
 	http    *http.Server
 }
 
-// New constructs a Server, validates its arguments, builds the router, and
-// configures the underlying http.Server. It does not start listening.
-func New(cfg *config.Config, logger *slog.Logger, db *store.DB, version string) (*Server, error) {
+// New constructs a *Server with all dependencies wired.
+func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, error) {
 	if cfg == nil {
-		return nil, errors.New("server.New: cfg must not be nil")
+		return nil, errors.New("server: cfg is nil")
 	}
 	if logger == nil {
-		return nil, errors.New("server.New: logger must not be nil")
+		return nil, errors.New("server: logger is nil")
 	}
-	if db == nil {
-		return nil, errors.New("server.New: db must not be nil")
+	if deps == nil || deps.DB == nil {
+		return nil, errors.New("server: deps with DB are required")
 	}
 
-	router := newRouter(db, version)
-	httpSrv := &http.Server{
+	router := newRouter(deps)
+
+	httpServer := &http.Server{
 		Handler:           router,
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
@@ -48,24 +64,24 @@ func New(cfg *config.Config, logger *slog.Logger, db *store.DB, version string) 
 	return &Server{
 		cfg:     cfg,
 		logger:  logger,
-		db:      db,
-		version: version,
-		http:    httpSrv,
+		db:      deps.DB,
+		version: deps.Version,
+		http:    httpServer,
 	}, nil
 }
 
-// Run opens a TCP listener, optionally sends the bound address to addrCh, then
-// serves HTTP until ctx is canceled. It shuts down gracefully with a 10-second
-// deadline. Returns nil on graceful shutdown.
+// Handler returns the underlying HTTP handler. Useful for httptest.NewServer.
+func (s *Server) Handler() http.Handler { return s.http.Handler }
+
+// Run starts the listener on cfg.HTTPPort and blocks until ctx is canceled.
 func (s *Server) Run(ctx context.Context, addrCh chan<- string) error {
 	addr := net.JoinHostPort("0.0.0.0", strconv.Itoa(s.cfg.HTTPPort))
 	lc := &net.ListenConfig{}
 	ln, err := lc.Listen(ctx, "tcp", addr)
 	if err != nil {
-		return fmt.Errorf("server.Run: listen %s: %w", addr, err)
+		return fmt.Errorf("server: listen %s: %w", addr, err)
 	}
 
-	// Non-blocking send so callers that don't read addrCh aren't blocked.
 	if addrCh != nil {
 		select {
 		case addrCh <- ln.Addr().String():
@@ -73,24 +89,28 @@ func (s *Server) Run(ctx context.Context, addrCh chan<- string) error {
 		}
 	}
 
-	serveErr := make(chan error, 1)
+	s.logger.Info("server starting", slog.String("addr", ln.Addr().String()), slog.String("version", s.version))
+
+	errCh := make(chan error, 1)
 	go func() {
-		serveErr <- s.http.Serve(ln)
+		if err := s.http.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- err
+			return
+		}
+		errCh <- nil
 	}()
 
 	select {
 	case <-ctx.Done():
-	case err := <-serveErr:
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("server.Run: serve: %w", err)
+		s.logger.Info("server stopping")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := s.http.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("server: shutdown: %w", err)
 		}
+		<-errCh
 		return nil
+	case err := <-errCh:
+		return err
 	}
-
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := s.http.Shutdown(shutdownCtx); err != nil {
-		return fmt.Errorf("server.Run: shutdown: %w", err)
-	}
-	return nil
 }
