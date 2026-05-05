@@ -23,7 +23,7 @@ func main() {
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) < 2 {
 		_, _ = fmt.Fprintln(stdout, "usage: acai <subcommand>")
-		_, _ = fmt.Fprintln(stdout, "subcommands: serve, migrate, version")
+		_, _ = fmt.Fprintln(stdout, "subcommands: serve, migrate, create-admin, version")
 		return 2
 	}
 	switch args[1] {
@@ -34,6 +34,8 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return runServe(ctx, stderr)
 	case "migrate":
 		return runMigrate(ctx, stderr)
+	case "create-admin":
+		return runCreateAdmin(ctx, args[2:], stdout, stderr)
 	default:
 		_, _ = fmt.Fprintf(stdout, "unknown subcommand: %q\n", args[1])
 		_, _ = fmt.Fprintln(stdout, "usage: acai <subcommand>")
