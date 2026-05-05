@@ -45,10 +45,7 @@ func runServe(ctx context.Context, stderr io.Writer) int {
 	}
 	mlSvc := auth.NewMagicLinkService(repo, baseURL)
 
-	var mailer mail.Mailer = mail.NewNoop(logger)
-	if !cfg.MailNoop {
-		_, _ = fmt.Fprintln(stderr, "warning: MAIL_NOOP=false but no production mailer is wired in P1b; using noop")
-	}
+	mailer := mail.NewFromConfig(cfg, logger)
 
 	authDeps := &handlers.AuthDeps{
 		Logger:    logger,
