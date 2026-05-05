@@ -1,0 +1,32 @@
+package views
+
+// Layout is the base HTML wrapper for site pages. title appears in <title>;
+// children render into <main>. Loads the platformd-derived theme and the
+// vendored Datastar runtime.
+templ Layout(title string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ title } — Acai</title>
+			<link rel="stylesheet" href="/_assets/css/app.css"/>
+			<script type="module" src="/_assets/js/datastar.min.js"></script>
+		</head>
+		<body>
+			<div class="app">
+				<header class="topbar">
+					<div class="brand">
+						<span class="brand-dot"></span>
+						<span class="brand-name">acai</span>
+					</div>
+				</header>
+				<main class="main">
+					<div class="main-narrow">
+						{ children... }
+					</div>
+				</main>
+			</div>
+		</body>
+	</html>
+}
