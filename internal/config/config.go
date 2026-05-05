@@ -30,7 +30,9 @@ type Config struct {
 	MailFromName string
 
 	// MailNoop disables all outbound mail when true; log entries are emitted
-	// instead. Parsed from MAIL_NOOP env var (true/false). Default: false.
+	// instead. Parsed from MAIL_NOOP env var (true/false). Default: true
+	// (dev-friendly — production must explicitly set MAIL_NOOP=false plus
+	// MAILGUN_API_KEY/MAILGUN_DOMAIN).
 	MailNoop bool
 
 	// MailgunAPIKey is the Mailgun private API key used to authenticate requests.
@@ -96,8 +98,9 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config: invalid LOG_LEVEL %q (allowed: debug, info, warn, error)", cfg.LogLevel)
 	}
 
-	// MAIL_NOOP
-	mailNoopStr := getenvDefault("MAIL_NOOP", "false")
+	// MAIL_NOOP — defaults to true for dev friendliness. Production must
+	// explicitly set MAIL_NOOP=false plus MAILGUN_API_KEY and MAILGUN_DOMAIN.
+	mailNoopStr := getenvDefault("MAIL_NOOP", "true")
 	switch mailNoopStr {
 	case "true":
 		cfg.MailNoop = true
@@ -113,10 +116,10 @@ func Load() (*Config, error) {
 	cfg.MailgunBaseURL = getenvDefault("MAILGUN_BASE_URL", "https://api.mailgun.net/v3")
 	if !cfg.MailNoop {
 		if cfg.MailgunAPIKey == "" {
-			return nil, errors.New("config: MAILGUN_API_KEY is required when MAIL_NOOP is false")
+			return nil, errors.New("config: MAILGUN_API_KEY is required when MAIL_NOOP=false (set MAIL_NOOP=true to disable real email sending in dev)")
 		}
 		if cfg.MailgunDomain == "" {
-			return nil, errors.New("config: MAILGUN_DOMAIN is required when MAIL_NOOP is false")
+			return nil, errors.New("config: MAILGUN_DOMAIN is required when MAIL_NOOP=false (set MAIL_NOOP=true to disable real email sending in dev)")
 		}
 	}
 

@@ -99,8 +99,8 @@ func TestLoad_DefaultsForP1bFields(t *testing.T) {
 	t.Setenv("MAIL_NOOP", "")
 	t.Setenv("MAIL_FROM_NAME", "")
 	t.Setenv("MAIL_FROM_EMAIL", "")
-	t.Setenv("MAILGUN_API_KEY", "test-key")
-	t.Setenv("MAILGUN_DOMAIN", "test.example.com")
+	t.Setenv("MAILGUN_API_KEY", "")
+	t.Setenv("MAILGUN_DOMAIN", "")
 	t.Setenv("URL_HOST", "")
 	t.Setenv("URL_SCHEME", "")
 
@@ -111,8 +111,8 @@ func TestLoad_DefaultsForP1bFields(t *testing.T) {
 	if len(cfg.SecretKeyBase) < 32 {
 		t.Errorf("Load() SecretKeyBase len = %d, want >= 32", len(cfg.SecretKeyBase))
 	}
-	if cfg.MailNoop {
-		t.Errorf("Load() MailNoop = true, want false")
+	if !cfg.MailNoop {
+		t.Errorf("Load() MailNoop default = false, want true (dev-friendly default)")
 	}
 	if cfg.URLHost != "localhost" {
 		t.Errorf("Load() URLHost = %q, want %q", cfg.URLHost, "localhost")
