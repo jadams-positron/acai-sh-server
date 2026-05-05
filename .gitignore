@@ -68,6 +68,14 @@ expert.log
 coverage.txt
 coverage.html
 
+# SQLite dev/test databases — never check in
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
 # tool caches
 /.golangci-cache/
 
