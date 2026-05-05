@@ -1,0 +1,44 @@
+# .golangci.yml — baseline lint config for the Go rewrite.
+# See https://golangci-lint.run/usage/configuration/ for the full schema.
+#
+# NOTE: written for golangci-lint v2 (installed: v2.12.1).
+# The original spec used v1 syntax; keys have been mapped to their v2
+# equivalents while preserving identical linter selection and exclusion intent.
+
+version: "2"
+
+run:
+  timeout: 3m
+  go: "1.22"
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  default: none   # v2 equivalent of v1 disable-all: true
+  enable:
+    - errcheck       # unchecked errors
+    # gosimple absorbed into staticcheck in v2; no separate entry needed
+    - govet          # `go vet` rules
+    - ineffassign    # ineffectual assignments
+    - staticcheck    # broad static analysis
+    # typecheck is always-on in v2; cannot be listed here
+    - unused         # unused code (functions, types, vars)
+    - misspell       # spelling
+    - bodyclose      # http response body closed
+    - errorlint      # error wrapping correctness
+    - nolintlint     # no naked //nolint without explanation
+
+  settings:   # v2 equivalent of v1 linters-settings
+    errcheck:
+      check-type-assertions: true
+      check-blank: false
+    misspell:
+      locale: US
+
+  exclusions:   # v2 equivalent of v1 issues.exclude-* keys
+    generated: lax
+    presets: []   # v2 equivalent of v1 exclude-use-default: false
+    rules:
+      - path: _test\.go
+        linters:
+          - errcheck   # tests legitimately discard returns from t.Setenv etc.
