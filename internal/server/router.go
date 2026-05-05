@@ -4,9 +4,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/acai-sh/server/internal/auth"
-	"github.com/acai-sh/server/internal/ops"
-	"github.com/acai-sh/server/internal/site"
+	"github.com/jadams-positron/acai-sh-server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/ops"
+	"github.com/jadams-positron/acai-sh-server/internal/site"
 )
 
 // newRouter builds the chi router with auth + site routes mounted.

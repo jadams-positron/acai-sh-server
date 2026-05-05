@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/acai-sh/server/internal/config"
-	"github.com/acai-sh/server/internal/ops"
-	"github.com/acai-sh/server/internal/store"
+	"github.com/jadams-positron/acai-sh-server/internal/config"
+	"github.com/jadams-positron/acai-sh-server/internal/ops"
+	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
 // runMigrate opens the DB and runs all pending goose migrations, then exits.

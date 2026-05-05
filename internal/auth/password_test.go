@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acai-sh/server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/auth"
 )
 
 func TestHash_RoundTrip(t *testing.T) {

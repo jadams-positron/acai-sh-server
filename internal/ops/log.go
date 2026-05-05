@@ -6,7 +6,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/acai-sh/server/internal/config"
+	"github.com/jadams-positron/acai-sh-server/internal/config"
 )
 
 // SetupLogger returns a *slog.Logger configured with slog.NewJSONHandler

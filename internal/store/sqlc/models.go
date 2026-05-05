@@ -80,6 +80,12 @@ type Product struct {
 	UpdatedAt   string
 }
 
+type Session struct {
+	Token  string
+	Data   []byte
+	Expiry float64
+}
+
 type Spec struct {
 	ID                 string
 	ProductID          string

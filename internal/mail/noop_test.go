@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/acai-sh/server/internal/mail"
+	"github.com/jadams-positron/acai-sh-server/internal/mail"
 )
 
 func TestNoop_LogsMagicLinkURLAtInfo(t *testing.T) {

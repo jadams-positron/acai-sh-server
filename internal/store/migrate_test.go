@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/acai-sh/server/internal/store"
+	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
 func TestRunMigrations_BringsSchemaUp(t *testing.T) {

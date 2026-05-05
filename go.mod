@@ -1,4 +1,4 @@
-module github.com/acai-sh/server
+module github.com/jadams-positron/acai-sh-server
 
 go 1.26
 

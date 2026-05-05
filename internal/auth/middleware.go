@@ -5,7 +5,7 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 
-	"github.com/acai-sh/server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
 )
 
 // LoadScope reads user_id from the session, fetches the user, and stores a

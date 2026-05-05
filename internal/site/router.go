@@ -7,8 +7,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 
-	"github.com/acai-sh/server/internal/auth"
-	"github.com/acai-sh/server/internal/site/handlers"
+	"github.com/jadams-positron/acai-sh-server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/site/handlers"
 )
 
 // MountAuthRoutes registers the login/logout routes on r. Caller is expected

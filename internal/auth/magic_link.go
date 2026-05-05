@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/acai-sh/server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
 )
 
 // MagicLinkValidity is the duration for which a magic-link login token is valid.

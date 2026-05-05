@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/acai-sh/server/internal/ops"
-	"github.com/acai-sh/server/internal/store"
+	"github.com/jadams-positron/acai-sh-server/internal/ops"
+	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
 func TestHealth_ReturnsOKWhenDBIsAlive(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 
 	"github.com/pressly/goose/v3"
 
-	"github.com/acai-sh/server/internal/store/migrations"
+	"github.com/jadams-positron/acai-sh-server/internal/store/migrations"
 )
 
 // RunMigrations runs all pending goose migrations against the write pool.

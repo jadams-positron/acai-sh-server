@@ -3,7 +3,7 @@ package config_test
 import (
 	"testing"
 
-	"github.com/acai-sh/server/internal/config"
+	"github.com/jadams-positron/acai-sh-server/internal/config"
 )
 
 func TestLoad_DefaultsWhenEnvMissing(t *testing.T) {

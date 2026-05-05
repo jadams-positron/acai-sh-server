@@ -14,14 +14,14 @@ import (
 
 	"github.com/gorilla/csrf"
 
-	"github.com/acai-sh/server/internal/auth"
-	"github.com/acai-sh/server/internal/config"
-	"github.com/acai-sh/server/internal/domain/accounts"
-	"github.com/acai-sh/server/internal/mail"
-	"github.com/acai-sh/server/internal/ops"
-	"github.com/acai-sh/server/internal/server"
-	"github.com/acai-sh/server/internal/site/handlers"
-	"github.com/acai-sh/server/internal/store"
+	"github.com/jadams-positron/acai-sh-server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/config"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/mail"
+	"github.com/jadams-positron/acai-sh-server/internal/ops"
+	"github.com/jadams-positron/acai-sh-server/internal/server"
+	"github.com/jadams-positron/acai-sh-server/internal/site/handlers"
+	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
 // captureMailer captures the magic-link URL instead of sending.

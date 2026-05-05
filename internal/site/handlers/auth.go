@@ -8,10 +8,10 @@ import (
 	"github.com/alexedwards/scs/v2"
 	"github.com/gorilla/csrf"
 
-	"github.com/acai-sh/server/internal/auth"
-	"github.com/acai-sh/server/internal/domain/accounts"
-	"github.com/acai-sh/server/internal/mail"
-	"github.com/acai-sh/server/internal/site/templates"
+	"github.com/jadams-positron/acai-sh-server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/mail"
+	"github.com/jadams-positron/acai-sh-server/internal/site/templates"
 )
 
 // AuthDeps groups the dependencies the auth handlers need.

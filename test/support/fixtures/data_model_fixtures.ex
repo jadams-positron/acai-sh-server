@@ -103,7 +103,7 @@ defmodule Acai.DataModelFixtures do
     attrs =
       attrs
       |> Enum.into(%{
-        repo_uri: "github.com/acai-sh/server",
+        repo_uri: "github.com/jadams-positron/acai-sh-server",
         branch_name: unique_branch_name(),
         last_seen_commit: "abc123"
       })
@@ -121,7 +121,7 @@ defmodule Acai.DataModelFixtures do
     attrs =
       attrs
       |> Enum.into(%{
-        repo_uri: "github.com/acai-sh/server",
+        repo_uri: "github.com/jadams-positron/acai-sh-server",
         branch_name: unique_branch_name(),
         last_seen_commit: "abc123",
         team_id: team.id
@@ -141,7 +141,7 @@ defmodule Acai.DataModelFixtures do
     branch =
       branch ||
         branch_fixture(Repo.get!(Team, product.team_id), %{
-          repo_uri: attrs[:repo_uri] || attrs["repo_uri"] || "github.com/acai-sh/server"
+          repo_uri: attrs[:repo_uri] || attrs["repo_uri"] || "github.com/jadams-positron/acai-sh-server"
         })
 
     attrs =
@@ -199,7 +199,7 @@ defmodule Acai.DataModelFixtures do
     branch =
       branch ||
         branch_fixture(team, %{
-          repo_uri: attrs[:repo_uri] || attrs["repo_uri"] || "github.com/acai-sh/server",
+          repo_uri: attrs[:repo_uri] || attrs["repo_uri"] || "github.com/jadams-positron/acai-sh-server",
           branch_name: attrs[:branch_name] || attrs["branch_name"] || "main",
           last_seen_commit:
             attrs[:last_seen_commit] || attrs["last_seen_commit"] || "abc123def456"
