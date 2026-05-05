@@ -214,7 +214,7 @@ CREATE TABLE feature_branch_refs (
   branch_id    TEXT NOT NULL REFERENCES branches ON DELETE CASCADE,
   feature_name TEXT NOT NULL,
   refs         TEXT NOT NULL DEFAULT '{}',
-  commit       TEXT NOT NULL,
+  "commit"     TEXT NOT NULL,
   pushed_at    TEXT NOT NULL,
   inserted_at  TEXT NOT NULL,
   updated_at   TEXT NOT NULL,
