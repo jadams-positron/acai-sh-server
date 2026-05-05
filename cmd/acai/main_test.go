@@ -100,6 +100,7 @@ func TestRun_MigrateSubcommand_RunsMigrationsAndExitsZero(t *testing.T) {
 	t.Setenv("DATABASE_PATH", dbPath)
 	t.Setenv("HTTP_PORT", "4000")
 	t.Setenv("LOG_LEVEL", "warn") // quiet logs
+	t.Setenv("MAIL_NOOP", "true")
 
 	var stdout, stderr bytes.Buffer
 	code := run(context.Background(), []string{"acai", "migrate"}, &stdout, &stderr)

@@ -2,10 +2,11 @@
 //
 // Fields are populated by Load and alphabetically sorted within each section.
 // P0 adds LogLevel; P1a adds DatabasePath and HTTPPort; P1b adds
-// SecretKeyBase, Mail*, and URL* fields.
+// SecretKeyBase, Mail*, and URL* fields; P1c adds Mailgun* fields.
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -31,6 +32,19 @@ type Config struct {
 	// MailNoop disables all outbound mail when true; log entries are emitted
 	// instead. Parsed from MAIL_NOOP env var (true/false). Default: false.
 	MailNoop bool
+
+	// MailgunAPIKey is the Mailgun private API key used to authenticate requests.
+	// Required when MailNoop is false.
+	MailgunAPIKey string
+
+	// MailgunBaseURL is the Mailgun API base URL. Defaults to
+	// https://api.mailgun.net/v3; override to https://api.eu.mailgun.net/v3 for
+	// EU-region domains.
+	MailgunBaseURL string
+
+	// MailgunDomain is the Mailgun sending domain (e.g. "mg.example.com").
+	// Required when MailNoop is false.
+	MailgunDomain string
 
 	// SecretKeyBase is the HMAC key used to sign session cookies and CSRF
 	// tokens. Must be at least 32 bytes. Never commit a real value; use the
@@ -91,6 +105,19 @@ func Load() (*Config, error) {
 		cfg.MailNoop = false
 	default:
 		return nil, fmt.Errorf("config: invalid MAIL_NOOP %q (allowed: true, false)", mailNoopStr)
+	}
+
+	// MAILGUN_*
+	cfg.MailgunAPIKey = getenvDefault("MAILGUN_API_KEY", "")
+	cfg.MailgunDomain = getenvDefault("MAILGUN_DOMAIN", "")
+	cfg.MailgunBaseURL = getenvDefault("MAILGUN_BASE_URL", "https://api.mailgun.net/v3")
+	if !cfg.MailNoop {
+		if cfg.MailgunAPIKey == "" {
+			return nil, errors.New("config: MAILGUN_API_KEY is required when MAIL_NOOP is false")
+		}
+		if cfg.MailgunDomain == "" {
+			return nil, errors.New("config: MAILGUN_DOMAIN is required when MAIL_NOOP is false")
+		}
 	}
 
 	// SECRET_KEY_BASE: must be at least 32 bytes

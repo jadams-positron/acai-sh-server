@@ -8,6 +8,7 @@ import (
 
 func TestLoad_DefaultsWhenEnvMissing(t *testing.T) {
 	t.Setenv("LOG_LEVEL", "")
+	t.Setenv("MAIL_NOOP", "true")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -20,6 +21,7 @@ func TestLoad_DefaultsWhenEnvMissing(t *testing.T) {
 
 func TestLoad_HonorsLogLevelEnv(t *testing.T) {
 	t.Setenv("LOG_LEVEL", "debug")
+	t.Setenv("MAIL_NOOP", "true")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -32,6 +34,7 @@ func TestLoad_HonorsLogLevelEnv(t *testing.T) {
 
 func TestLoad_RejectsInvalidLogLevel(t *testing.T) {
 	t.Setenv("LOG_LEVEL", "verbose")
+	t.Setenv("MAIL_NOOP", "true")
 
 	_, err := config.Load()
 	if err == nil {
@@ -42,6 +45,7 @@ func TestLoad_RejectsInvalidLogLevel(t *testing.T) {
 func TestLoad_DefaultsForDatabasePathAndHTTPPort(t *testing.T) {
 	t.Setenv("DATABASE_PATH", "")
 	t.Setenv("HTTP_PORT", "")
+	t.Setenv("MAIL_NOOP", "true")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -58,6 +62,7 @@ func TestLoad_DefaultsForDatabasePathAndHTTPPort(t *testing.T) {
 func TestLoad_HonorsDatabasePathAndHTTPPort(t *testing.T) {
 	t.Setenv("DATABASE_PATH", "/data/test.db")
 	t.Setenv("HTTP_PORT", "8080")
+	t.Setenv("MAIL_NOOP", "true")
 
 	cfg, err := config.Load()
 	if err != nil {
@@ -94,6 +99,8 @@ func TestLoad_DefaultsForP1bFields(t *testing.T) {
 	t.Setenv("MAIL_NOOP", "")
 	t.Setenv("MAIL_FROM_NAME", "")
 	t.Setenv("MAIL_FROM_EMAIL", "")
+	t.Setenv("MAILGUN_API_KEY", "test-key")
+	t.Setenv("MAILGUN_DOMAIN", "test.example.com")
 	t.Setenv("URL_HOST", "")
 	t.Setenv("URL_SCHEME", "")
 
@@ -117,6 +124,7 @@ func TestLoad_DefaultsForP1bFields(t *testing.T) {
 
 func TestLoad_RejectsShortSecretKeyBase(t *testing.T) {
 	t.Setenv("SECRET_KEY_BASE", "tooshort")
+	t.Setenv("MAIL_NOOP", "true")
 
 	_, err := config.Load()
 	if err == nil {
@@ -135,9 +143,47 @@ func TestLoad_RejectsInvalidMailNoop(t *testing.T) {
 
 func TestLoad_RejectsInvalidURLScheme(t *testing.T) {
 	t.Setenv("URL_SCHEME", "ftp")
+	t.Setenv("MAIL_NOOP", "true")
 
 	_, err := config.Load()
 	if err == nil {
 		t.Fatalf("Load() with URL_SCHEME=ftp should have errored, got nil")
+	}
+}
+
+func TestLoad_MailgunRequiredWhenMailNoopFalse(t *testing.T) {
+	t.Setenv("MAIL_NOOP", "false")
+	t.Setenv("MAILGUN_API_KEY", "")
+	t.Setenv("MAILGUN_DOMAIN", "")
+
+	_, err := config.Load()
+	if err == nil {
+		t.Fatalf("Load() with MAIL_NOOP=false and no MAILGUN_API_KEY/DOMAIN should have errored, got nil")
+	}
+}
+
+func TestLoad_MailgunDefaults(t *testing.T) {
+	t.Setenv("MAIL_NOOP", "true")
+	t.Setenv("MAILGUN_API_KEY", "")
+	t.Setenv("MAILGUN_DOMAIN", "")
+	t.Setenv("MAILGUN_BASE_URL", "")
+
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() returned error: %v", err)
+	}
+	if cfg.MailgunBaseURL != "https://api.mailgun.net/v3" {
+		t.Errorf("Load() MailgunBaseURL = %q, want %q", cfg.MailgunBaseURL, "https://api.mailgun.net/v3")
+	}
+}
+
+func TestLoad_MailgunNoopBypassesValidation(t *testing.T) {
+	t.Setenv("MAIL_NOOP", "true")
+	t.Setenv("MAILGUN_API_KEY", "")
+	t.Setenv("MAILGUN_DOMAIN", "")
+
+	_, err := config.Load()
+	if err != nil {
+		t.Fatalf("Load() with MAIL_NOOP=true should succeed even without Mailgun creds, got: %v", err)
 	}
 }
