@@ -1,32 +1,42 @@
-// Command acai is the single-binary entrypoint for the Acai server rewrite.
+// Command acai is the single-binary entrypoint for the Acai server.
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 // version is overridden at build time via -ldflags="-X main.version=...".
 var version = "0.0.0-dev"
 
 func main() {
-	os.Exit(run(os.Args, os.Stdout))
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	code := run(ctx, os.Args, os.Stdout, os.Stderr)
+	stop()
+	os.Exit(code)
 }
 
-func run(args []string, w io.Writer) int {
+func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) < 2 {
-		_, _ = fmt.Fprintln(w, "usage: acai <subcommand>")
-		_, _ = fmt.Fprintln(w, "subcommands: version")
+		_, _ = fmt.Fprintln(stdout, "usage: acai <subcommand>")
+		_, _ = fmt.Fprintln(stdout, "subcommands: serve, migrate, version")
 		return 2
 	}
 	switch args[1] {
 	case "version":
-		printVersion(w, version)
+		printVersion(stdout, version)
 		return 0
+	case "serve":
+		return runServe(ctx, stderr)
+	case "migrate":
+		return runMigrate(ctx, stderr)
 	default:
-		_, _ = fmt.Fprintf(w, "unknown subcommand: %q\n", args[1])
-		_, _ = fmt.Fprintln(w, "usage: acai <subcommand>")
+		_, _ = fmt.Fprintf(stdout, "unknown subcommand: %q\n", args[1])
+		_, _ = fmt.Fprintln(stdout, "usage: acai <subcommand>")
 		return 2
 	}
 }
