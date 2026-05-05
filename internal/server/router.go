@@ -1,23 +1,31 @@
-// Package server wires together the HTTP server, chi router, and middleware.
 package server
 
 import (
-	"net/http"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/acai-sh/server/internal/auth"
 	"github.com/acai-sh/server/internal/ops"
-	"github.com/acai-sh/server/internal/store"
+	"github.com/acai-sh/server/internal/site"
 )
 
-// newRouter builds the chi router with standard middleware and all route mounts.
-func newRouter(db *store.DB, version string) chi.Router {
+// newRouter builds the chi router with auth + site routes mounted.
+func newRouter(deps *RouterDeps) chi.Router {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Recoverer)
 
-	r.Method(http.MethodGet, "/_health", ops.HealthHandler(db, version))
+	// Browser routes get sessions + scope.
+	r.Group(func(r chi.Router) {
+		r.Use(deps.Sessions.LoadAndSave)
+		r.Use(auth.LoadScope(deps.Sessions, deps.Accounts))
+
+		site.MountAuthRoutes(r, deps.AuthHandlerDeps, deps.CSRFKey, deps.SecureCookie)
+		site.MountAuthRequiredStub(r)
+	})
+
+	// Health check is outside the session middleware.
+	r.Method("GET", "/_health", ops.HealthHandler(deps.DB, deps.Version))
 
 	return r
 }
