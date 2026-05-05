@@ -1,6 +1,6 @@
 # Go + Datastar Rewrite — Design Spec
 
-**Status:** Approved (sections 1–9, all confirmed by user)
+**Status:** Approved by user (brainstorm sections 1–7 confirmed inline; sections 8–9 advanced under standing "keep going" instruction).
 **Author:** Jason Adams
 **Date:** 2026-05-05
 **Scope:** Replace the Acai Phoenix monolith with a single Go binary that serves the public REST API and a Datastar-driven site, backed by SQLite.
@@ -60,7 +60,7 @@ SQLite is the only datastore. WAL mode, single-writer pool + multi-reader pool. 
 | Datastar SDK | `github.com/starfederation/datastar/sdk/go` | Official Go SDK: SSE patching, signal handling, `data-*` directives |
 | Sessions | `github.com/alexedwards/scs/v2` + `scs/sqlitestore` | Cookie-signed sessions backed by SQLite |
 | Password hashing | `golang.org/x/crypto/argon2` (Argon2id) | Matches `argon2_elixir` on-disk hash format → legacy hashes verify without rehashing |
-| Email (Mailgun) | `github.com/mailgun/mailgun-go/v4` (or stdlib `net/smtp`) | Same SMTP target as today |
+| Email | `github.com/mailgun/mailgun-go/v4` for Mailgun's HTTP API; pluggable behind a `Mailer` interface so an SMTP fallback (`net/smtp`) and a `noop` dev/test impl can both implement it | Same Mailgun target as today; interface keeps it swappable |
 | TLS / proxy | Caddy (unchanged container) | Auto-TLS for self-host |
 | Backup | `github.com/benbjohnson/litestream` (embedded as goroutine) | Continuous WAL → S3 |
 | Logging | `log/slog` with **`slog.NewJSONHandler` only — JSON output everywhere, dev and prod** | Stdlib, structured, machine-readable |
@@ -217,10 +217,13 @@ CREATE TABLE users (
   email           TEXT NOT NULL COLLATE NOCASE,
   hashed_password TEXT,
   confirmed_at    TEXT,
-  authenticated_at TEXT,
   inserted_at     TEXT NOT NULL,
   updated_at      TEXT NOT NULL
 );
+-- Note: there is NO users.authenticated_at column. authenticated_at lives on
+-- the scs session payload (see §7), not on the user. The Phoenix code surfaced
+-- it on the User struct via a join with users_tokens — the equivalent in Go is
+-- reading it from the session inside auth.LoadScope.
 CREATE UNIQUE INDEX users_email_idx ON users(email COLLATE NOCASE);
 
 CREATE TABLE email_tokens (   -- renamed from users_tokens; sessions moved to scs
@@ -369,6 +372,10 @@ CREATE TABLE feature_branch_refs (
 );
 CREATE INDEX feature_branch_refs_branch_idx ON feature_branch_refs(branch_id);
 ```
+
+### scs sessions table
+
+`scs/sqlitestore` creates and manages its own `sessions` table on first run (token TEXT PK, data BLOB, expiry TIMESTAMP). It is **not** part of the goose migrations — scs owns its schema. We treat it as opaque storage; reading it directly is debugging only.
 
 ### Connection setup
 
@@ -531,7 +538,8 @@ Port to `slog` JSON output with same field names: `endpoint`, `request_size`, `r
 For a single-user self-host, only one place earns real-time updates: when an agent calls `/api/v1/push` while the user has the page open. Implementation:
 
 - API push handler publishes to `internal/pubsub` after commit
-- `/sse/team/{team_id}/events` (auth via session cookie) holds a long-lived SSE connection per browser tab
+- `/sse/team/{team_id}/events` holds a long-lived SSE connection per browser tab
+- **Auth on this endpoint:** session cookie required (`auth.RequireAuth`) **and** the handler verifies `team_id` in the URL belongs to a team the user is a member of (lookup in `domain/teams.IsMember(scope.User, teamID)`); 403 otherwise. This prevents one user from subscribing to another team's events
 - SSE handler renders the affected fragment via templ → emits `datastar-merge-fragments` with target DOM ID
 - Pages with no live-update need (settings, token mgmt) don't open this connection
 
@@ -931,7 +939,7 @@ These do not block the rewrite but are explicitly deferred:
 - **Litestream sidecar instead of embedded.** Only if embedded turns out to interfere with the main process.
 - **Browser tests (Playwright).** Not part of the initial test layers.
 - **Multi-instance scaling.** Not designed for. SQLite single-writer + in-process pubsub assumes single-instance deployment.
-- **Stripping `users_tokens` session-context rows from imported data** — handled via filter, but worth a smoke check on first import that no session tokens leaked through.
+- **Stripping `users_tokens` session-context rows from imported data.** The import filters `WHERE context != 'session'`. Worth a smoke check on first run: `SELECT COUNT(*) FROM email_tokens WHERE context = 'session'` should return 0 after migration.
 
 ---
 
