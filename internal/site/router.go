@@ -29,6 +29,8 @@ func MountAuthRoutes(r chi.Router, deps *handlers.AuthDeps, csrfKey []byte, secu
 		r.Use(auth.RedirectIfAuth)
 		r.Get("/users/log-in", handlers.LoginNew(deps))
 		r.Post("/users/log-in", handlers.LoginCreate(deps))
+		r.Get("/users/register", handlers.RegisterNew(deps))
+		r.Post("/users/register", handlers.RegisterCreate(deps))
 	})
 
 	// Magic-link consume — bypasses CSRF.

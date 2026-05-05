@@ -87,12 +87,79 @@ func LoginConfirm(d *AuthDeps) http.HandlerFunc {
 			return
 		}
 
+		// First-login confirmation. No-op if already confirmed.
+		if err := d.Accounts.MarkConfirmed(r.Context(), user.ID); err != nil {
+			d.Logger.Warn("login: mark confirmed", "error", err)
+			// non-fatal — proceed with login
+		}
+
 		if err := d.Sessions.RenewToken(r.Context()); err != nil {
 			d.Logger.Warn("login: renew token", "error", err)
 		}
 
 		auth.Login(r.Context(), d.Sessions, user.ID)
 		http.Redirect(w, r, "/teams", http.StatusSeeOther)
+	}
+}
+
+// RegisterNew GETs the registration form.
+func RegisterNew(_ *AuthDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = templates.RegisterPage.Execute(w, templates.RegisterPageData{
+			CSRFFieldName: "gorilla.csrf.Token",
+			CSRFToken:     csrf.Token(r),
+		})
+	}
+}
+
+// RegisterCreate POSTs the registration form: creates the user if they don't
+// exist, then sends a magic-link. If the email is already registered, re-sends
+// a magic link silently. Always renders the same success page (no enumeration).
+func RegisterCreate(d *AuthDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		email := r.PostForm.Get("email")
+
+		user, err := d.Accounts.GetUserByEmail(r.Context(), email)
+		switch {
+		case accounts.IsNotFound(err):
+			// New user — create account with no password.
+			created, createErr := d.Accounts.CreateUser(r.Context(), accounts.CreateUserParams{
+				Email:          email,
+				HashedPassword: "",
+			})
+			if createErr != nil {
+				d.Logger.Warn("register: create user", "error", createErr)
+				renderRegisterWithFlash(w, r, "Something went wrong. Please try again.")
+				return
+			}
+			user = created
+		case err == nil:
+			// Existing user — fall through to send magic link below.
+		default:
+			d.Logger.Warn("register: lookup user", "error", err)
+		}
+
+		if user != nil {
+			url, _, genErr := d.MagicLink.GenerateLoginURL(r.Context(), user)
+			if genErr == nil {
+				_ = d.Mailer.SendMagicLink(r.Context(), mail.MagicLinkArgs{
+					To:        user.Email,
+					URL:       url,
+					FromEmail: d.FromEmail,
+					FromName:  d.FromName,
+				})
+			} else {
+				d.Logger.Warn("register: generate magic link", "error", genErr)
+			}
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_ = templates.RegisterRequestedPage.Execute(w, templates.RegisterRequestedPageData{Email: email})
 	}
 }
 
@@ -110,6 +177,16 @@ func renderLoginWithFlash(w http.ResponseWriter, r *http.Request, flash string) 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_ = templates.LoginPage.Execute(w, templates.LoginPageData{
+		Flash:         flash,
+		CSRFFieldName: "gorilla.csrf.Token",
+		CSRFToken:     csrf.Token(r),
+	})
+}
+
+func renderRegisterWithFlash(w http.ResponseWriter, r *http.Request, flash string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_ = templates.RegisterPage.Execute(w, templates.RegisterPageData{
 		Flash:         flash,
 		CSRFFieldName: "gorilla.csrf.Token",
 		CSRFToken:     csrf.Token(r),
