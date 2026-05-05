@@ -9,8 +9,16 @@ import (
 )
 
 type Querier interface {
+	CreateEmailToken(ctx context.Context, arg CreateEmailTokenParams) (EmailToken, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteEmailToken(ctx context.Context, id string) error
+	DeleteEmailTokensForUser(ctx context.Context, arg DeleteEmailTokensForUserParams) error
+	GetEmailTokenByHashAndContext(ctx context.Context, arg GetEmailTokenByHashAndContextParams) (EmailToken, error)
+	GetUserByEmail(ctx context.Context, email string) (User, error)
+	GetUserByID(ctx context.Context, id string) (User, error)
 	// Ping returns 1 if the DB is reachable. Used by /_health.
 	Ping(ctx context.Context) (int64, error)
+	UpdateUserConfirmedAt(ctx context.Context, arg UpdateUserConfirmedAtParams) error
 }
 
 var _ Querier = (*Queries)(nil)
