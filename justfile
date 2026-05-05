@@ -9,6 +9,21 @@ default:
 build:
     go build -trimpath -ldflags="-s -w -X main.version=$(git describe --always --dirty 2>/dev/null || echo dev)" -o acai ./cmd/acai
 
+# run sources .env (copy from .env.example) then runs `acai serve`. Builds first if needed.
+run *args: build
+    @[ -f .env ] || (echo "missing .env — copy .env.example then edit" && exit 1)
+    @set -a; . ./.env; set +a; ./acai serve {{args}}
+
+# run-migrate sources .env then runs `acai migrate`.
+run-migrate: build
+    @[ -f .env ] || (echo "missing .env — copy .env.example then edit" && exit 1)
+    @set -a; . ./.env; set +a; ./acai migrate
+
+# run-create-admin sources .env then runs `acai create-admin --email <email>`.
+run-create-admin email: build
+    @[ -f .env ] || (echo "missing .env — copy .env.example then edit" && exit 1)
+    @set -a; . ./.env; set +a; ./acai create-admin --email {{email}}
+
 # Run gofmt-style auto-formatting (uses `gofmt -s -w` for simplification + canonicalization).
 fmt:
     gofmt -s -w .
@@ -66,7 +81,6 @@ init-hooks:
 # Install code-generation tools:
 #   - templ@v0.3.1001    (Go HTML template compiler)
 #   - sqlc@v1.31.1       (SQL-to-Go type-safe query generator)
-#   - tailwindcss        (standalone CLI, downloaded to $GOPATH/bin)
 # Run once after a fresh clone or when pinned versions change.
 install-tools:
     #!/usr/bin/env bash
@@ -75,39 +89,20 @@ install-tools:
     go install github.com/a-h/templ/cmd/templ@v0.3.1001
     echo "install-tools: installing sqlc@v1.31.1 ..."
     go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
-    echo "install-tools: downloading tailwindcss standalone CLI ..."
-    arch="$(uname -m)"
-    case "$arch" in
-        arm64)  tw_arch="macos-arm64" ;;
-        x86_64) tw_arch="macos-x86_64" ;;
-        *)      echo "Unsupported arch: $arch"; exit 1 ;;
-    esac
-    tw_bin="$(go env GOPATH)/bin/tailwindcss"
-    curl -fsSL "https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-${tw_arch}" \
-        -o "$tw_bin"
-    chmod +x "$tw_bin"
     echo "install-tools: done."
     templ --version
     sqlc version
-    tailwindcss --help | head -1
 
 # Generate templ → Go bindings. Run after editing *.templ files.
 gen-templ:
     templ generate ./internal/site/views/...
     @echo "gen-templ: done."
 
-# Compile Tailwind CSS. Run after adding/removing classes in views or handlers.
-gen-css:
-    tailwindcss -i assets/css/app.css -o assets/dist/app.css --minify
-    @echo "gen-css: done."
-
-# Run code generators: templ, sqlc, tailwindcss.
-# Run whenever queries/, migrations/, *.templ, or CSS @source paths change.
-gen:
-    templ generate ./internal/site/views/... || true
+# Run code generators: templ, sqlc.
+# Run whenever queries/, migrations/, or *.templ files change.
+gen: gen-templ
     sqlc generate
-    tailwindcss -i assets/css/app.css -o assets/dist/app.css --minify
-    @echo "gen: all generators done."
+    @echo "gen: done."
 
 # Remove built artifacts.
 clean:

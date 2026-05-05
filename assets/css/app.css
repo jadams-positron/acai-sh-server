@@ -1,9 +1,344 @@
-/* Tailwind v4 entry point for the Acai Go server (datastar rewrite).
-   Generated output lands at assets/dist/app.css via `just gen-css`.
-   https://tailwindcss.com/docs/v4-upgrade */
+:root {
+    color-scheme: dark;
 
-@import "tailwindcss";
+    /* === Color tokens (from platformd) === */
+    --color-base: 12, 17, 23;
+    --color-surface: 14, 24, 34;
+    --color-accent-rgb: 94, 198, 198;
+    --color-fg-rgb: 232, 236, 240;
+    --color-muted-rgb: 138, 150, 168;
+    --color-danger-rgb: 255, 123, 123;
+    --color-success-rgb: 107, 255, 190;
+    --color-gold-rgb: 201, 164, 76;
 
-/* Scan templ views and Go HTTP handlers for class usage. */
-@source "../../internal/site/views";
-@source "../../internal/site/handlers";
+    /* === Semantic colors === */
+    --bg: rgb(var(--color-base));
+    --panel: rgba(var(--color-surface), 0.82);
+    --fg: rgb(var(--color-fg-rgb));
+    --muted: rgb(var(--color-muted-rgb));
+    --accent: rgb(var(--color-accent-rgb));
+    --danger: rgb(var(--color-danger-rgb));
+    --success: rgb(var(--color-success-rgb));
+
+    /* === Borders & effects === */
+    --border: rgba(var(--color-accent-rgb), 0.35);
+    --border-subtle: rgba(var(--color-accent-rgb), 0.15);
+    --border-hover: rgba(var(--color-accent-rgb), 0.2);
+    --glow: rgba(var(--color-accent-rgb), 0.45);
+    --glow-soft: rgba(var(--color-accent-rgb), 0.12);
+    --glow-inner: rgba(var(--color-accent-rgb), 0.08);
+
+    /* === Surfaces === */
+    --topbar: rgb(10, 15, 22);
+    --surface-inset: rgba(10, 18, 28, 0.7);
+
+    /* === Spacing === */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+    --space-xl: 32px;
+    --space-2xl: 40px;
+
+    /* === Radii === */
+    --radius-sm: 10px;
+    --radius-md: 12px;
+    --radius-lg: 14px;
+    --radius-xl: 18px;
+    --radius-pill: 999px;
+
+    /* === Typography === */
+    --font-sans: "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "JetBrains Mono", "Menlo", "Consolas", "Courier New", monospace;
+    --text-xs: 11px;
+    --text-sm: 12px;
+    --text-base: 13px;
+    --text-md: 14px;
+    --text-lg: 16px;
+    --text-xl: 18px;
+    --text-2xl: 20px;
+    --text-title: 40px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background: radial-gradient(circle at 10% 10%, #0f1e2a, var(--bg) 55%);
+    color: var(--fg);
+    min-height: 100vh;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+a:hover {
+    text-decoration: underline;
+    text-decoration-color: var(--border);
+    text-underline-offset: 3px;
+}
+
+/* === App shell === */
+.app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.app::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(transparent 95%, rgba(var(--color-accent-rgb), 0.14) 98%),
+        linear-gradient(90deg, transparent 95%, rgba(var(--color-accent-rgb), 0.10) 98%);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.40;
+}
+
+/* === Topbar === */
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-md) 28px;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--topbar);
+    backdrop-filter: blur(14px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    font-size: var(--text-sm);
+    color: var(--muted);
+}
+
+.brand-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: var(--radius-pill);
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--glow);
+}
+
+.brand-name {
+    color: var(--fg);
+}
+
+/* === Main content area === */
+.main {
+    flex-grow: 1;
+    padding: var(--space-2xl) var(--space-lg);
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.main-narrow {
+    max-width: 440px;
+    width: 100%;
+}
+
+/* === Page headers === */
+.page-header {
+    text-align: left;
+    margin-bottom: var(--space-lg);
+}
+
+.title {
+    font-size: var(--text-title);
+    margin: 0 0 var(--space-sm);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.title-sm {
+    font-size: 28px;
+}
+
+.subtitle {
+    color: var(--muted);
+    margin: 0;
+    font-size: var(--text-md);
+}
+
+/* === Panel (card) === */
+.panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: var(--space-xl);
+    box-shadow:
+        0 0 30px var(--glow-soft),
+        0 24px 60px rgba(0, 0, 0, 0.45);
+    position: relative;
+}
+
+.panel::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-xl);
+    box-shadow: inset 0 0 20px var(--glow-inner);
+    pointer-events: none;
+}
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: var(--space-lg);
+}
+
+.panel-header h1 {
+    font-size: var(--text-2xl);
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+
+.panel-footer {
+    margin-top: var(--space-lg);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-subtle);
+    color: var(--muted);
+    font-size: var(--text-sm);
+    text-align: center;
+}
+
+/* === Forms === */
+.form {
+    display: grid;
+    gap: var(--space-md);
+}
+
+.form-field {
+    display: grid;
+    gap: 6px;
+}
+
+.form-label {
+    color: var(--muted);
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+.form-input {
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 10px var(--space-md);
+    color: var(--fg);
+    font-size: var(--text-md);
+    font-family: inherit;
+    transition: 0.2s ease;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 14px var(--glow-soft);
+}
+
+.form-input::placeholder {
+    color: var(--muted);
+    opacity: 0.6;
+}
+
+/* === Buttons === */
+.button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-sm);
+    padding: 10px var(--space-lg);
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    background: transparent;
+    font-size: var(--text-md);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: 0.2s ease;
+    text-decoration: none;
+}
+
+.button:hover {
+    box-shadow: 0 0 16px var(--glow);
+    background: rgba(var(--color-accent-rgb), 0.06);
+    text-decoration: none;
+}
+
+.button-primary {
+    background: rgba(var(--color-accent-rgb), 0.14);
+}
+
+.button-primary:hover {
+    background: rgba(var(--color-accent-rgb), 0.22);
+}
+
+.button-block {
+    width: 100%;
+}
+
+.button-ghost {
+    border-color: var(--border-hover);
+    color: var(--muted);
+}
+
+.button-ghost:hover {
+    border-color: var(--border);
+    color: var(--fg);
+}
+
+/* === Banners (flash messages) === */
+.banner {
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+    font-size: var(--text-md);
+    margin-bottom: var(--space-md);
+}
+
+.banner-error {
+    border: 1px solid rgba(var(--color-danger-rgb), 0.6);
+    color: var(--danger);
+    background: rgba(var(--color-danger-rgb), 0.08);
+}
+
+.banner-info {
+    border: 1px solid var(--border);
+    color: var(--accent);
+    background: rgba(var(--color-accent-rgb), 0.06);
+}
+
+/* === Empty state === */
+.empty-state {
+    padding: var(--space-md);
+    color: var(--muted);
+    text-align: center;
+    border: 1px dashed var(--border-hover);
+    border-radius: var(--radius-md);
+}
+
+/* === Responsive === */
+@media (max-width: 640px) {
+    .topbar { padding: var(--space-md) 20px; }
+    .main { padding: var(--space-lg) var(--space-md); }
+    .title { font-size: 32px; }
+}
