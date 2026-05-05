@@ -1,0 +1,101 @@
+package views
+
+// LoginPageProps configures LoginPage rendering.
+type LoginPageProps struct {
+	Flash     string
+	CSRFToken string
+}
+
+templ LoginPage(p LoginPageProps) {
+	@Layout("Log in") {
+		<section class="panel">
+			<header class="panel-header">
+				<h1>Log in</h1>
+			</header>
+			if p.Flash != "" {
+				<div class="banner banner-error">{ p.Flash }</div>
+			}
+			<form method="post" action="/users/log-in" class="form">
+				<input type="hidden" name="gorilla.csrf.Token" value={ p.CSRFToken }/>
+				<div class="form-field">
+					<label class="form-label" for="login-email">Email</label>
+					<input id="login-email" class="form-input" type="email" name="email" required autofocus placeholder="you@example.com"/>
+				</div>
+				<button class="button button-primary button-block" type="submit">
+					Send magic link
+				</button>
+			</form>
+			<div class="panel-footer">
+				No account? <a href="/users/register">Sign up</a>
+			</div>
+		</section>
+	}
+}
+
+// LoginRequestedProps configures the post-submit "check your email" page.
+type LoginRequestedProps struct {
+	Email string
+}
+
+templ LoginRequestedPage(p LoginRequestedProps) {
+	@Layout("Check your email") {
+		<section class="panel">
+			<header class="panel-header">
+				<h1>Check your email</h1>
+			</header>
+			<p>If <strong>{ p.Email }</strong> matches an account, you'll receive a magic link shortly.</p>
+			<div class="panel-footer">
+				<a href="/users/log-in">Back to log in</a>
+			</div>
+		</section>
+	}
+}
+
+// RegisterPageProps configures registration form rendering.
+type RegisterPageProps struct {
+	Flash     string
+	CSRFToken string
+}
+
+templ RegisterPage(p RegisterPageProps) {
+	@Layout("Sign up") {
+		<section class="panel">
+			<header class="panel-header">
+				<h1>Sign up</h1>
+			</header>
+			<p class="subtitle" style="margin-bottom: var(--space-md);">We'll send you a magic link. No password needed.</p>
+			if p.Flash != "" {
+				<div class="banner banner-error">{ p.Flash }</div>
+			}
+			<form method="post" action="/users/register" class="form">
+				<input type="hidden" name="gorilla.csrf.Token" value={ p.CSRFToken }/>
+				<div class="form-field">
+					<label class="form-label" for="register-email">Email</label>
+					<input id="register-email" class="form-input" type="email" name="email" required autofocus placeholder="you@example.com"/>
+				</div>
+				<button class="button button-primary button-block" type="submit">
+					Sign up
+				</button>
+			</form>
+			<div class="panel-footer">
+				Have an account? <a href="/users/log-in">Log in</a>
+			</div>
+		</section>
+	}
+}
+
+// RegisterRequestedProps configures the post-submit page after register.
+type RegisterRequestedProps struct {
+	Email string
+}
+
+templ RegisterRequestedPage(p RegisterRequestedProps) {
+	@Layout("Check your email") {
+		<section class="panel">
+			<header class="panel-header">
+				<h1>Check your email</h1>
+			</header>
+			<p>We've sent a magic link to <strong>{ p.Email }</strong>. Click it to log in.</p>
+		</section>
+	}
+}

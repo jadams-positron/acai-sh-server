@@ -1,0 +1,23 @@
+package views
+
+// TeamsStubProps drives the P1d /teams stub page.
+type TeamsStubProps struct {
+	UserEmail string
+	CSRFToken string
+}
+
+templ TeamsStub(p TeamsStubProps) {
+	@Layout("Teams") {
+		<header class="page-header">
+			<h1 class="title">Teams</h1>
+			<p class="subtitle">Logged in as <strong>{ p.UserEmail }</strong></p>
+		</header>
+		<section class="panel">
+			<p>The real teams page lands in a later phase. This page exists to prove auth works end-to-end.</p>
+			<form method="post" action="/users/log-out" style="margin-top: var(--space-lg);">
+				<input type="hidden" name="gorilla.csrf.Token" value={ p.CSRFToken }/>
+				<button class="button button-ghost" type="submit">Log out</button>
+			</form>
+		</section>
+	}
+}
