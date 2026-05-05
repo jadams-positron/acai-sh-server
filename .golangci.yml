@@ -9,7 +9,7 @@ version: "2"
 
 run:
   timeout: 3m
-  go: "1.22"
+  go: "1.26"
   tests: true
   modules-download-mode: readonly
 
