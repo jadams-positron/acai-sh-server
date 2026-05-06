@@ -22,6 +22,7 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
+	domainspecs "github.com/jadams-positron/acai-sh-server/internal/domain/specs"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/ops"
 	"github.com/jadams-positron/acai-sh-server/internal/site"
@@ -40,6 +41,7 @@ type RouterDeps struct {
 	Teams           *teams.Repository
 	Products        *products.Repository
 	Implementations *implementations.Repository
+	Specs           *domainspecs.Repository
 	Operations      *operations.Config
 	APILimiter      apimiddleware.Limiter
 }
@@ -98,6 +100,7 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Teams:           deps.Teams,
 		Products:        deps.Products,
 		Implementations: deps.Implementations,
+		Specs:           deps.Specs,
 		Operations:      deps.Operations,
 		Limiter:         deps.APILimiter,
 	})
