@@ -494,6 +494,43 @@ code {
     border-radius: var(--radius-md);
 }
 
+/* Larger, left-aligned empty state for primary onboarding moments. */
+.empty-state-rich {
+    text-align: left;
+    padding: var(--space-xl);
+    display: grid;
+    gap: var(--space-md);
+}
+
+.empty-state-rich .empty-state-headline {
+    color: var(--fg);
+    font-size: var(--text-xl);
+    font-weight: 600;
+    margin: 0;
+}
+
+.empty-state-rich p {
+    margin: 0;
+    max-width: 64ch;
+}
+
+.empty-state-snippet {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    color: var(--fg);
+    overflow-x: auto;
+    white-space: pre;
+}
+
+.empty-state-snippet .comment {
+    color: var(--muted);
+}
+
 /* === Badge === */
 .badge {
     display: inline-block;
