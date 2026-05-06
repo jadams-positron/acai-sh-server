@@ -105,7 +105,15 @@ func Run(ctx context.Context, log *slog.Logger, cfg *Config) error {
 // It is intended to be launched in a goroutine alongside the HTTP server;
 // the provided ctx must be the same context used for graceful shutdown so
 // that replication stops cleanly when the server stops.
+//
+// When cfg is nil (no LITESTREAM_S3_BUCKET configured), Run returns nil
+// immediately. We treat that as "intentionally disabled" and exit instead
+// of looping — otherwise the goroutine would log-spam every retry interval.
 func RunWithRecover(ctx context.Context, log *slog.Logger, cfg *Config) {
+	if cfg == nil {
+		log.Info("litestream: not configured — set LITESTREAM_S3_BUCKET to enable replication")
+		return
+	}
 	backoff := time.Second
 	for ctx.Err() == nil {
 		func() {
