@@ -76,7 +76,7 @@ func TestRateLimit_Middleware_429OnExceeded(t *testing.T) {
 	})
 
 	doRequest := func() int {
-		req := httptest.NewRequest(http.MethodGet, "/x", http.NoBody)
+		req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "/x", http.NoBody)
 		rec := httptest.NewRecorder()
 		e.ServeHTTP(rec, req)
 		return rec.Code

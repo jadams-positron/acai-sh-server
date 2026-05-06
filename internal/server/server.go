@@ -68,7 +68,9 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 	e.Use(echomiddleware.Recover())
 
 	// CSRF middleware — used selectively on browser routes via a Group.
-	csrfMW := echomiddleware.CSRFWithConfig(echomiddleware.CSRFConfig{
+	// TokenLookup uses the gorilla-compatible form field name for wire compatibility
+	// with existing templates. The string is a config key, not a credential.
+	csrfMW := echomiddleware.CSRFWithConfig(echomiddleware.CSRFConfig{ //nolint:gosec // G101 false positive: TokenLookup is a config key, not a credential
 		TokenLookup:    "form:gorilla.csrf.Token",
 		CookieName:     "_acai_csrf",
 		CookieHTTPOnly: true,

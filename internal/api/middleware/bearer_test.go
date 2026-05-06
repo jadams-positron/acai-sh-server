@@ -64,7 +64,7 @@ func runBearer(t *testing.T, repo *teams.Repository, header string) (rec *httpte
 		return c.NoContent(http.StatusOK)
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/x", http.NoBody)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "/api/v1/x", http.NoBody)
 	if header != "" {
 		req.Header.Set("Authorization", header)
 	}

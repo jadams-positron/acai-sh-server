@@ -17,7 +17,7 @@ func TestSizeCap_AllowsUnderCap(t *testing.T) {
 	e.POST("/x", func(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
 	})
-	req := httptest.NewRequest(http.MethodPost, "/x", strings.NewReader("hello"))
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, "/x", strings.NewReader("hello"))
 	req.ContentLength = 5
 	req.Header.Set("Content-Length", "5")
 	rec := httptest.NewRecorder()
@@ -34,7 +34,7 @@ func TestSizeCap_RejectsOverCap(t *testing.T) {
 		t.Errorf("downstream should not be called")
 		return c.NoContent(http.StatusOK)
 	})
-	req := httptest.NewRequest(http.MethodPost, "/x", http.NoBody)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, "/x", http.NoBody)
 	req.Header.Set("Content-Length", "1024")
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
@@ -49,7 +49,7 @@ func TestSizeCap_NoCap(t *testing.T) {
 	e.POST("/x", func(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
 	})
-	req := httptest.NewRequest(http.MethodPost, "/x", http.NoBody)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodPost, "/x", http.NoBody)
 	req.Header.Set("Content-Length", "9999999")
 	rec := httptest.NewRecorder()
 	e.ServeHTTP(rec, req)
