@@ -50,6 +50,53 @@ func (q *Queries) CreateImplementation(ctx context.Context, arg CreateImplementa
 	return i, err
 }
 
+const getImplementationByID = `-- name: GetImplementationByID :one
+SELECT i.id, i.product_id, i.team_id, i.parent_implementation_id,
+       i.name, i.description, i.is_active, i.inserted_at, i.updated_at,
+       p.name AS product_name
+FROM implementations i
+JOIN products p ON p.id = i.product_id
+WHERE i.id = ?
+  AND i.team_id = ?
+LIMIT 1
+`
+
+type GetImplementationByIDParams struct {
+	ID     string
+	TeamID string
+}
+
+type GetImplementationByIDRow struct {
+	ID                     string
+	ProductID              string
+	TeamID                 string
+	ParentImplementationID *string
+	Name                   string
+	Description            *string
+	IsActive               int64
+	InsertedAt             string
+	UpdatedAt              string
+	ProductName            string
+}
+
+func (q *Queries) GetImplementationByID(ctx context.Context, arg GetImplementationByIDParams) (GetImplementationByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getImplementationByID, arg.ID, arg.TeamID)
+	var i GetImplementationByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.ProductID,
+		&i.TeamID,
+		&i.ParentImplementationID,
+		&i.Name,
+		&i.Description,
+		&i.IsActive,
+		&i.InsertedAt,
+		&i.UpdatedAt,
+		&i.ProductName,
+	)
+	return i, err
+}
+
 const listImplementationsByBranch = `-- name: ListImplementationsByBranch :many
 SELECT DISTINCT i.id, i.product_id, i.team_id, i.parent_implementation_id,
                 i.name, i.description, i.is_active, i.inserted_at, i.updated_at,

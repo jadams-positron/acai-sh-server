@@ -54,3 +54,9 @@ func MountFeatureShowRoutes(g *echo.Group, deps *handlers.FeatureShowDeps, csrfM
 	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
 	authd.GET("/t/:team_name/f/:feature_name", handlers.FeatureShow(deps))
 }
+
+// MountImplFeatureShowRoutes registers the impl×feature drill-down route.
+func MountImplFeatureShowRoutes(g *echo.Group, deps *handlers.ImplFeatureShowDeps, csrfMiddleware echo.MiddlewareFunc) {
+	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
+	authd.GET("/t/:team_name/i/:impl_slug/f/:feature_name", handlers.ImplFeatureShow(deps))
+}

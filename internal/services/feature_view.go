@@ -1,10 +1,11 @@
 // Package services — adds FeatureViewService that composes the data needed
-// for the /t/{team}/f/{feature} page.
+// for the /t/{team}/f/{feature} page and the /t/{team}/i/{impl}/f/{feature} page.
 package services
 
 import (
 	"context"
 	"sort"
+	"time"
 
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
@@ -202,4 +203,144 @@ func stripDashes(s string) string {
 		}
 	}
 	return string(out)
+}
+
+// ParseImplSlug returns the impl ID from a slug of the form {name}-{uuidNoDashes}.
+// Returns "" if the slug doesn't match the expected shape.
+func ParseImplSlug(slug string) string {
+	// A UUID-no-dashes is exactly 32 hex chars. The slug ends with a '-' before
+	// that 32-char segment. Find the last '-', validate the suffix is 32 hex chars,
+	// then reinsert dashes in the 8-4-4-4-12 layout.
+	idx := -1
+	for i := len(slug) - 1; i >= 0; i-- {
+		if slug[i] == '-' {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 || idx == len(slug)-1 {
+		return ""
+	}
+	rest := slug[idx+1:]
+	if len(rest) != 32 {
+		return ""
+	}
+	for i := range len(rest) {
+		c := rest[i]
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
+			return ""
+		}
+	}
+	// Reinsert dashes: 8-4-4-4-12 layout.
+	return rest[:8] + "-" + rest[8:12] + "-" + rest[12:16] + "-" + rest[16:20] + "-" + rest[20:]
+}
+
+// ImplFeatureView is the resolved data for the impl×feature drill-down page.
+type ImplFeatureView struct {
+	Implementation *implementations.Implementation
+	Spec           *specs.Spec
+	Refs           *specs.FeatureBranchRef
+	States         *specs.FeatureImplState
+	AcidEntries    []*ACIDEntry
+}
+
+// ACIDEntry is one ACID row with its derived state and refs.
+type ACIDEntry struct {
+	ACID          string
+	Requirement   string
+	Deprecated    bool
+	Status        *string
+	Comment       *string
+	UpdatedAt     *time.Time
+	Refs          []specs.CodeRef
+	RefsCount     int // count of non-test refs
+	TestRefsCount int // count of test refs
+}
+
+// ImplFeatureViewRequest is the input for ResolveImplFeatureView.
+type ImplFeatureViewRequest struct {
+	Team              *teams.Team
+	ImplementationID  string
+	FeatureName       string
+	IncludeDeprecated bool
+}
+
+// ResolveImplFeatureView composes the page data for the impl×feature drill-down.
+func (s *FeatureViewService) ResolveImplFeatureView(ctx context.Context, req ImplFeatureViewRequest) (*ImplFeatureView, error) {
+	impl, err := s.impls.GetByID(ctx, req.ImplementationID, req.Team.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	out := &ImplFeatureView{Implementation: impl}
+
+	// Pick the refs branch (most-recent pushed_at for this feature), then fall
+	// back to the first tracked branch for the spec.
+	var branch *specs.Branch
+	if b, berr := s.specs.PickRefsBranch(ctx, impl.ID, req.FeatureName); berr == nil {
+		branch = b
+		if refs, rerr := s.specs.GetRefs(ctx, branch.ID, req.FeatureName); rerr == nil {
+			out.Refs = refs
+		}
+	}
+	if branch == nil {
+		if b, berr := s.specs.FirstTrackedBranch(ctx, impl.ID); berr == nil {
+			branch = b
+		}
+	}
+	if branch != nil {
+		if spec, serr := s.specs.GetSpec(ctx, branch.ID, req.FeatureName); serr == nil {
+			out.Spec = spec
+		}
+	}
+	if states, serr := s.specs.GetStates(ctx, impl.ID, req.FeatureName); serr == nil {
+		out.States = states
+	}
+
+	if out.Spec != nil {
+		out.AcidEntries = buildACIDEntries(out.Spec, out.Refs, out.States, req.IncludeDeprecated)
+	}
+	return out, nil
+}
+
+func buildACIDEntries(spec *specs.Spec, refs *specs.FeatureBranchRef, states *specs.FeatureImplState, includeDeprecated bool) []*ACIDEntry {
+	keys := make([]string, 0, len(spec.Requirements))
+	for k := range spec.Requirements {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	var out []*ACIDEntry
+	for _, acid := range keys {
+		r := spec.Requirements[acid]
+		if r.Deprecated && !includeDeprecated {
+			continue
+		}
+		e := &ACIDEntry{
+			ACID:        acid,
+			Requirement: r.Requirement,
+			Deprecated:  r.Deprecated,
+		}
+		if states != nil {
+			if st, ok := states.States[acid]; ok {
+				e.Status = st.Status
+				e.Comment = st.Comment
+				e.UpdatedAt = st.UpdatedAt
+			}
+		}
+		if refs != nil {
+			if refList, ok := refs.Refs[acid]; ok {
+				e.Refs = refList
+				for _, rr := range refList {
+					if rr.IsTest {
+						e.TestRefsCount++
+					} else {
+						e.RefsCount++
+					}
+				}
+			}
+		}
+		out = append(out, e)
+	}
+	return out
 }

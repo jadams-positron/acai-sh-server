@@ -1,0 +1,131 @@
+package views
+
+import (
+	"fmt"
+
+	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+	"github.com/jadams-positron/acai-sh-server/internal/services"
+)
+
+// ImplFeatureProps drives the /t/{team}/i/{impl_slug}/f/{feature} page.
+type ImplFeatureProps struct {
+	Team           *teams.Team
+	Implementation *implementations.Implementation
+	ImplSlug       string
+	FeatureName    string
+	Acids          []*services.ACIDEntry
+	HasSpec        bool
+}
+
+templ ImplFeature(p ImplFeatureProps) {
+	@Layout(p.FeatureName + " · " + p.Implementation.Name) {
+		<header class="page-header">
+			<p class="subtitle">
+				<a href="/teams">Teams</a>
+				{ " / " }
+				<a href={ templ.SafeURL("/t/" + p.Team.Name) }>{ p.Team.Name }</a>
+				{ " / " }
+				<a href={ templ.SafeURL("/t/" + p.Team.Name + "/p/" + p.Implementation.ProductName) }>{ p.Implementation.ProductName }</a>
+				{ " / " }
+				<span>{ p.Implementation.Name }</span>
+				{ " / " }
+				<span>{ p.FeatureName }</span>
+			</p>
+			<h1 class="title">{ p.FeatureName }</h1>
+			<p class="subtitle">
+				Implementation: <strong>{ p.Implementation.Name }</strong>
+				{ " · " }
+				Product: <strong>{ p.Implementation.ProductName }</strong>
+			</p>
+		</header>
+		if !p.HasSpec {
+			<div class="empty-state">
+				<p>No spec for <strong>{ p.FeatureName }</strong> on impl <strong>{ p.Implementation.Name }</strong>.</p>
+				<p class="subtitle">Push a spec via <code>acai push</code>.</p>
+			</div>
+		} else if len(p.Acids) == 0 {
+			<div class="empty-state">
+				<p>This spec has no acceptance criteria.</p>
+			</div>
+		} else {
+			<div class="panel" style="padding: 0;" data-signals="{ expanded: '' }">
+				<table style="width: 100%; border-collapse: collapse;">
+					<thead>
+						<tr style="border-bottom: 1px solid var(--border-subtle); text-align: left;">
+							<th style="padding: var(--space-md);">ACID</th>
+							<th style="padding: var(--space-md);">Requirement</th>
+							<th style="padding: var(--space-md);">Status</th>
+							<th style="padding: var(--space-md); text-align: right;">Refs</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, a := range p.Acids {
+							@acidRow(a)
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	}
+}
+
+templ acidRow(a *services.ACIDEntry) {
+	<tr style="border-top: 1px solid var(--border-subtle);">
+		<td style="padding: var(--space-md); font-family: var(--font-mono); font-size: var(--text-sm);">
+			<button
+				type="button"
+				data-on-click={ "$expanded = $expanded === '" + a.ACID + "' ? '' : '" + a.ACID + "'" }
+				style="background: none; border: 0; padding: 0; cursor: pointer; color: var(--accent); font: inherit; text-align: left;"
+			>{ a.ACID }</button>
+		</td>
+		<td style="padding: var(--space-md);">
+			{ a.Requirement }
+			if a.Comment != nil && *a.Comment != "" {
+				<div class="subtitle" style="margin-top: var(--space-xs); font-style: italic;">{ *a.Comment }</div>
+			}
+		</td>
+		<td style="padding: var(--space-md);">
+			@statusPill(a.Status)
+		</td>
+		<td style="padding: var(--space-md); text-align: right; color: var(--muted); font-size: var(--text-sm);">
+			if a.RefsCount > 0 || a.TestRefsCount > 0 {
+				if a.TestRefsCount > 0 {
+					{ fmt.Sprintf("%d (+%d tests)", a.RefsCount, a.TestRefsCount) }
+				} else {
+					{ fmt.Sprintf("%d", a.RefsCount) }
+				}
+			} else {
+				<span class="subtitle">—</span>
+			}
+		</td>
+	</tr>
+	if len(a.Refs) > 0 {
+		<tr data-show={ "$expanded === '" + a.ACID + "'" } style="background: var(--surface-inset);">
+			<td colspan="4" style="padding: var(--space-md);">
+				<ul style="margin: 0; padding-left: var(--space-lg);">
+					for _, r := range a.Refs {
+						<li style="font-family: var(--font-mono); font-size: var(--text-sm);">
+							{ r.Path }
+							if r.IsTest {
+								<span class="badge" style="margin-left: var(--space-sm);">test</span>
+							}
+						</li>
+					}
+				</ul>
+			</td>
+		</tr>
+	}
+}
+
+templ statusPill(status *string) {
+	if status == nil {
+		<span class="badge">untouched</span>
+	} else if *status == "completed" || *status == "accepted" {
+		<span class="badge" style="border-color: var(--success); color: var(--success);">{ *status }</span>
+	} else if *status == "blocked" || *status == "rejected" {
+		<span class="badge" style="border-color: var(--danger); color: var(--danger);">{ *status }</span>
+	} else {
+		<span class="badge">{ *status }</span>
+	}
+}
