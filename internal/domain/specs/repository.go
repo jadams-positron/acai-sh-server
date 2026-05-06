@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +14,19 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/store"
 	"github.com/jadams-positron/acai-sh-server/internal/store/sqlc"
 )
+
+// UpsertSpecParams groups the inputs for UpsertSpec.
+type UpsertSpecParams struct {
+	ProductID          string
+	BranchID           string
+	Path               *string
+	LastSeenCommit     string
+	FeatureName        string
+	FeatureDescription *string
+	FeatureVersion     string
+	RawContent         *string
+	Requirements       map[string]Requirement
+}
 
 // Repository wraps the sqlc queries for the specs domain.
 type Repository struct{ db *store.DB }
@@ -200,6 +214,209 @@ func (r *Repository) UpsertStates(ctx context.Context, implID, featureName strin
 		UpdatedAt:        now,
 	}); err != nil {
 		return fmt.Errorf("specs: UpsertFeatureImplState: %w", err)
+	}
+	return nil
+}
+
+// UpsertBranch finds or creates the branch row for (teamID, repoURI, branchName).
+// On found: updates last_seen_commit. On insert: full row.
+// Returns (branch, created, error).
+func (r *Repository) UpsertBranch(ctx context.Context, teamID, repoURI, branchName, commit string) (*Branch, bool, error) {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	qr := sqlc.New(r.db.Read)
+	qw := sqlc.New(r.db.Write)
+
+	row, err := qr.GetBranchByTeamRepoAndName(ctx, sqlc.GetBranchByTeamRepoAndNameParams{
+		TeamID:     teamID,
+		RepoUri:    repoURI,
+		BranchName: branchName,
+	})
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, false, fmt.Errorf("specs: UpsertBranch get: %w", err)
+	}
+
+	if !errors.Is(err, sql.ErrNoRows) {
+		// Found — update last_seen_commit.
+		if err2 := qw.UpdateBranchLastSeenCommit(ctx, sqlc.UpdateBranchLastSeenCommitParams{
+			LastSeenCommit: commit,
+			UpdatedAt:      now,
+			ID:             row.ID,
+		}); err2 != nil {
+			return nil, false, fmt.Errorf("specs: UpsertBranch update: %w", err2)
+		}
+		row.LastSeenCommit = commit
+		row.UpdatedAt = now
+		return branchFromRow(row), false, nil
+	}
+
+	// Not found — insert.
+	id, err := uuid.NewV7()
+	if err != nil {
+		return nil, false, fmt.Errorf("specs: UpsertBranch uuid: %w", err)
+	}
+	newRow, err := qw.CreateBranch(ctx, sqlc.CreateBranchParams{
+		ID:             id.String(),
+		TeamID:         teamID,
+		RepoUri:        repoURI,
+		BranchName:     branchName,
+		LastSeenCommit: commit,
+		InsertedAt:     now,
+		UpdatedAt:      now,
+	})
+	if err != nil {
+		return nil, false, fmt.Errorf("specs: UpsertBranch insert: %w", err)
+	}
+	return branchFromRow(newRow), true, nil
+}
+
+// UpsertSpec finds or creates the spec for (productID, branchID, featureName).
+// Returns (spec, created, error) — created is true when the row did not exist before.
+func (r *Repository) UpsertSpec(ctx context.Context, p UpsertSpecParams) (*Spec, bool, error) {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	qr := sqlc.New(r.db.Read)
+	qw := sqlc.New(r.db.Write)
+
+	// Check whether the row exists before we upsert (to decide created vs updated).
+	_, getErr := qr.GetSpecByBranchAndFeature(ctx, sqlc.GetSpecByBranchAndFeatureParams{
+		BranchID:    p.BranchID,
+		FeatureName: p.FeatureName,
+	})
+	existed := !errors.Is(getErr, sql.ErrNoRows)
+	if getErr != nil && !errors.Is(getErr, sql.ErrNoRows) {
+		return nil, false, fmt.Errorf("specs: UpsertSpec get: %w", getErr)
+	}
+
+	// Marshal requirements using a local type with JSON tags.
+	type reqJSON struct {
+		Requirement string   `json:"requirement"`
+		Deprecated  bool     `json:"deprecated,omitempty"`
+		Note        *string  `json:"note,omitempty"`
+		ReplacedBy  []string `json:"replaced_by,omitempty"`
+	}
+	reqOut := make(map[string]reqJSON, len(p.Requirements))
+	for k, v := range p.Requirements {
+		reqOut[k] = reqJSON(v)
+	}
+	reqsRaw, err := json.Marshal(reqOut)
+	if err != nil {
+		return nil, false, fmt.Errorf("specs: UpsertSpec marshal requirements: %w", err)
+	}
+
+	id, err := uuid.NewV7()
+	if err != nil {
+		return nil, false, fmt.Errorf("specs: UpsertSpec uuid: %w", err)
+	}
+
+	featureVersion := p.FeatureVersion
+	if featureVersion == "" {
+		featureVersion = "1.0.0"
+	}
+
+	row, err := qw.UpsertSpec(ctx, sqlc.UpsertSpecParams{
+		ID:                 id.String(),
+		ProductID:          p.ProductID,
+		BranchID:           p.BranchID,
+		Path:               p.Path,
+		LastSeenCommit:     p.LastSeenCommit,
+		ParsedAt:           now,
+		FeatureName:        p.FeatureName,
+		FeatureDescription: p.FeatureDescription,
+		FeatureVersion:     featureVersion,
+		RawContent:         p.RawContent,
+		Requirements:       string(reqsRaw),
+		InsertedAt:         now,
+		UpdatedAt:          now,
+	})
+	if err != nil {
+		return nil, false, fmt.Errorf("specs: UpsertSpec upsert: %w", err)
+	}
+
+	spec, err := specFromRow(row)
+	if err != nil {
+		return nil, false, err
+	}
+	return spec, !existed, nil
+}
+
+// UpsertFeatureBranchRef writes the refs for (branchID, featureName).
+// When override is false, existing refs are merged with incoming (incoming keys win).
+// When override is true, incoming refs fully replace any existing row.
+func (r *Repository) UpsertFeatureBranchRef(ctx context.Context, branchID, featureName string, refs map[string][]CodeRef, commit string, override bool) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	qr := sqlc.New(r.db.Read)
+	qw := sqlc.New(r.db.Write)
+
+	finalRefs := refs
+	if !override {
+		// Fetch existing row and merge — existing keys not in incoming survive.
+		existing, err := qr.GetFeatureBranchRef(ctx, sqlc.GetFeatureBranchRefParams{
+			BranchID:    branchID,
+			FeatureName: featureName,
+		})
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("specs: UpsertFeatureBranchRef get: %w", err)
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			existingRow, err2 := refsFromRow(existing)
+			if err2 != nil {
+				return err2
+			}
+			merged := make(map[string][]CodeRef, len(existingRow.Refs)+len(refs))
+			maps.Copy(merged, existingRow.Refs)
+			// incoming overwrites
+			maps.Copy(merged, refs)
+			finalRefs = merged
+		}
+	}
+
+	// Marshal to JSON.
+	type codeRefJSON struct {
+		Path   string `json:"path"`
+		IsTest bool   `json:"is_test"`
+	}
+	out := make(map[string][]codeRefJSON, len(finalRefs))
+	for k, crefs := range finalRefs {
+		arr := make([]codeRefJSON, 0, len(crefs))
+		for _, cr := range crefs {
+			arr = append(arr, codeRefJSON(cr))
+		}
+		out[k] = arr
+	}
+	raw, err := json.Marshal(out)
+	if err != nil {
+		return fmt.Errorf("specs: UpsertFeatureBranchRef marshal: %w", err)
+	}
+
+	id, err := uuid.NewV7()
+	if err != nil {
+		return fmt.Errorf("specs: UpsertFeatureBranchRef uuid: %w", err)
+	}
+
+	return qw.UpsertFeatureBranchRef(ctx, sqlc.UpsertFeatureBranchRefParams{
+		ID:          id.String(),
+		BranchID:    branchID,
+		FeatureName: featureName,
+		Refs:        string(raw),
+		Commit:      commit,
+		PushedAt:    now,
+		InsertedAt:  now,
+		UpdatedAt:   now,
+	})
+}
+
+// UpsertTrackedBranch inserts a tracked_branches row for (implID, branchID) if not
+// already present. Silently no-ops if the row exists.
+func (r *Repository) UpsertTrackedBranch(ctx context.Context, implID, branchID, repoURI string) error {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	qw := sqlc.New(r.db.Write)
+	if err := qw.UpsertTrackedBranch(ctx, sqlc.UpsertTrackedBranchParams{
+		ImplementationID: implID,
+		BranchID:         branchID,
+		RepoUri:          repoURI,
+		InsertedAt:       now,
+		UpdatedAt:        now,
+	}); err != nil {
+		return fmt.Errorf("specs: UpsertTrackedBranch: %w", err)
 	}
 	return nil
 }

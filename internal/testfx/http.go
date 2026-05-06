@@ -84,6 +84,11 @@ func (c *Client) PATCHRaw(path, contentType string, body io.Reader) *Response {
 	return c.do(http.MethodPatch, path, nil, body, contentType)
 }
 
+// POSTRaw issues a POST with a raw body and explicit content type.
+func (c *Client) POSTRaw(path, contentType string, body io.Reader) *Response {
+	return c.do(http.MethodPost, path, nil, body, contentType)
+}
+
 // POSTForm issues a POST with form-encoded body.
 func (c *Client) POSTForm(path string, form url.Values) *Response {
 	body := strings.NewReader(form.Encode())
