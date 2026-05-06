@@ -173,6 +173,24 @@ func (r *Repository) ListTrackingBranch(ctx context.Context, teamID, branchID st
 	return out, nil
 }
 
+// GetByID returns the implementation with the given id under teamID, or ErrNotFound.
+func (r *Repository) GetByID(ctx context.Context, id, teamID string) (*Implementation, error) {
+	q := sqlc.New(r.db.Read)
+	row, err := q.GetImplementationByID(ctx, sqlc.GetImplementationByIDParams{
+		ID:     id,
+		TeamID: teamID,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("implementations: GetByID: %w", err)
+	}
+	return fromRow(row.ID, row.ProductID, row.TeamID, row.ParentImplementationID,
+		row.Name, row.Description, row.IsActive,
+		row.InsertedAt, row.UpdatedAt, row.ProductName), nil
+}
+
 // GetByProductAndName returns the active implementation under product with the
 // given name, or ErrNotFound.
 func (r *Repository) GetByProductAndName(ctx context.Context, productID, name string) (*Implementation, error) {

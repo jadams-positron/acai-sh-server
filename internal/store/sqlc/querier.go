@@ -24,6 +24,7 @@ type Querier interface {
 	GetEmailTokenByHashAndContext(ctx context.Context, arg GetEmailTokenByHashAndContextParams) (EmailToken, error)
 	GetFeatureBranchRef(ctx context.Context, arg GetFeatureBranchRefParams) (FeatureBranchRef, error)
 	GetFeatureImplState(ctx context.Context, arg GetFeatureImplStateParams) (FeatureImplState, error)
+	GetImplementationByID(ctx context.Context, arg GetImplementationByIDParams) (GetImplementationByIDRow, error)
 	GetImplementationByProductAndName(ctx context.Context, arg GetImplementationByProductAndNameParams) (Implementation, error)
 	GetProductByTeamAndName(ctx context.Context, arg GetProductByTeamAndNameParams) (Product, error)
 	GetSpecByBranchAndFeature(ctx context.Context, arg GetSpecByBranchAndFeatureParams) (Spec, error)
