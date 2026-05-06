@@ -21,7 +21,7 @@ templ FeatureShow(p FeatureShowProps) {
 		<header class="page-header">
 			<h1 class="title">{ p.FeatureName }</h1>
 			if p.FeatureDescription != "" {
-				<p class="subtitle">{ p.FeatureDescription }</p>
+				@featureDescription(p.FeatureDescription)
 			}
 		</header>
 
@@ -95,4 +95,19 @@ func percent(part, total int) float64 {
 		return 0
 	}
 	return float64(part) / float64(total) * 100
+}
+
+// featureDescription renders the feature description with readable max-width.
+// Long descriptions (>240 chars) collapse behind a native <details> disclosure;
+// a click anywhere on the preview text expands. Short ones render plainly.
+templ featureDescription(text string) {
+	if len(text) > 240 {
+		<details class="desc-collapse">
+			<summary class="desc-collapse-summary">
+				<p class="subtitle desc-collapse-text">{ text }</p>
+			</summary>
+		</details>
+	} else {
+		<p class="subtitle desc-plain">{ text }</p>
+	}
 }
