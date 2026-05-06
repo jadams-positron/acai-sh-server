@@ -10,12 +10,14 @@ import (
 
 type Querier interface {
 	CreateAccessToken(ctx context.Context, arg CreateAccessTokenParams) (AccessToken, error)
+	CreateBranch(ctx context.Context, arg CreateBranchParams) (Branch, error)
 	CreateEmailToken(ctx context.Context, arg CreateEmailTokenParams) (EmailToken, error)
 	CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteEmailToken(ctx context.Context, id string) error
 	DeleteEmailTokensForUser(ctx context.Context, arg DeleteEmailTokensForUserParams) error
 	GetAccessTokenByPrefix(ctx context.Context, tokenPrefix string) (AccessToken, error)
+	GetBranchByTeamRepoAndName(ctx context.Context, arg GetBranchByTeamRepoAndNameParams) (Branch, error)
 	GetEmailTokenByHashAndContext(ctx context.Context, arg GetEmailTokenByHashAndContextParams) (EmailToken, error)
 	GetFeatureBranchRef(ctx context.Context, arg GetFeatureBranchRefParams) (FeatureBranchRef, error)
 	GetFeatureImplState(ctx context.Context, arg GetFeatureImplStateParams) (FeatureImplState, error)
@@ -42,10 +44,17 @@ type Querier interface {
 	Ping(ctx context.Context) (int64, error)
 	RevokeAccessToken(ctx context.Context, arg RevokeAccessTokenParams) error
 	UpdateAccessTokenLastUsed(ctx context.Context, arg UpdateAccessTokenLastUsedParams) error
+	UpdateBranchLastSeenCommit(ctx context.Context, arg UpdateBranchLastSeenCommitParams) error
 	UpdateUserConfirmedAt(ctx context.Context, arg UpdateUserConfirmedAtParams) error
+	UpsertFeatureBranchRef(ctx context.Context, arg UpsertFeatureBranchRefParams) error
 	// Upserts the row for (implementation_id, feature_name) with the given states JSON.
 	// Insert if missing, update otherwise.
 	UpsertFeatureImplState(ctx context.Context, arg UpsertFeatureImplStateParams) error
+	// Returns the inserted/updated spec row. The `xmax` trick used in Postgres
+	// doesn't work in SQLite; we use the changes() function indirectly by checking
+	// whether the row existed before. Caller decides created-vs-updated.
+	UpsertSpec(ctx context.Context, arg UpsertSpecParams) (Spec, error)
+	UpsertTrackedBranch(ctx context.Context, arg UpsertTrackedBranchParams) error
 }
 
 var _ Querier = (*Queries)(nil)

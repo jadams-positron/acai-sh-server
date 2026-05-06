@@ -63,47 +63,28 @@ func Mount(parent *echo.Echo, deps *Deps) {
 	fcSvc := services.NewFeatureContextService(deps.Products, deps.Implementations, deps.Specs)
 	ifSvc := services.NewImplementationFeaturesService(deps.Products, deps.Implementations, deps.Specs)
 	fsSvc := services.NewFeatureStatesService(deps.Products, deps.Implementations, deps.Specs)
+	pushSvc := services.NewPushService(deps.Products, deps.Implementations, deps.Specs)
 	srv := &Server{
 		products:        deps.Products,
 		implementations: deps.Implementations,
 		featureContext:  fcSvc,
 		implFeatures:    ifSvc,
 		featureStates:   fsSvc,
+		push:            pushSvc,
 		operations:      deps.Operations,
 	}
 	spec.RegisterHandlers(authd, srv)
 }
 
-// Server is the concrete spec.ServerInterface implementation. Methods that are
-// implemented live in their own file (e.g. server_implementations.go); the
-// rest are inherited from the embedded unimplementedServer.
+// Server is the concrete spec.ServerInterface implementation. All 5 /api/v1/*
+// methods are implemented in their own file (e.g. server_implementations.go,
+// server_push.go).
 type Server struct {
-	unimplementedServer
 	products        *products.Repository
 	implementations *implementations.Repository
 	featureContext  *services.FeatureContextService
 	implFeatures    *services.ImplementationFeaturesService
 	featureStates   *services.FeatureStatesService
+	push            *services.PushService
 	operations      *operations.Config
-}
-
-// unimplementedServer satisfies spec.ServerInterface with 501 stubs.
-// Method names follow oapi-codegen conventions (AcaiWebApi…) to match the
-// generated interface; revive var-naming warnings are suppressed because the
-// names are dictated by the code generator.
-type unimplementedServer struct{}
-
-//nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface
-func (unimplementedServer) AcaiWebApiFeatureContextControllerShow(_ echo.Context, _ spec.AcaiWebApiFeatureContextControllerShowParams) error {
-	return echo.NewHTTPError(http.StatusNotImplemented, "feature-context not implemented yet (P2b)")
-}
-
-//nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface
-func (unimplementedServer) AcaiWebApiImplementationsControllerIndex(_ echo.Context, _ spec.AcaiWebApiImplementationsControllerIndexParams) error {
-	return echo.NewHTTPError(http.StatusNotImplemented, "implementations not implemented yet (P2b)")
-}
-
-//nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface
-func (unimplementedServer) AcaiWebApiPushControllerCreate(_ echo.Context) error {
-	return echo.NewHTTPError(http.StatusNotImplemented, "push not implemented yet (P2c)")
 }

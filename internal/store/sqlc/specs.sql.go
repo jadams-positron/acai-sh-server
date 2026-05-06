@@ -9,6 +9,73 @@ import (
 	"context"
 )
 
+const createBranch = `-- name: CreateBranch :one
+INSERT INTO branches (id, team_id, repo_uri, branch_name, last_seen_commit, inserted_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+RETURNING id, team_id, repo_uri, branch_name, last_seen_commit, inserted_at, updated_at
+`
+
+type CreateBranchParams struct {
+	ID             string
+	TeamID         string
+	RepoUri        string
+	BranchName     string
+	LastSeenCommit string
+	InsertedAt     string
+	UpdatedAt      string
+}
+
+func (q *Queries) CreateBranch(ctx context.Context, arg CreateBranchParams) (Branch, error) {
+	row := q.db.QueryRowContext(ctx, createBranch,
+		arg.ID,
+		arg.TeamID,
+		arg.RepoUri,
+		arg.BranchName,
+		arg.LastSeenCommit,
+		arg.InsertedAt,
+		arg.UpdatedAt,
+	)
+	var i Branch
+	err := row.Scan(
+		&i.ID,
+		&i.TeamID,
+		&i.RepoUri,
+		&i.BranchName,
+		&i.LastSeenCommit,
+		&i.InsertedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getBranchByTeamRepoAndName = `-- name: GetBranchByTeamRepoAndName :one
+SELECT id, team_id, repo_uri, branch_name, last_seen_commit, inserted_at, updated_at
+FROM branches
+WHERE team_id = ? AND repo_uri = ? AND branch_name = ?
+LIMIT 1
+`
+
+type GetBranchByTeamRepoAndNameParams struct {
+	TeamID     string
+	RepoUri    string
+	BranchName string
+}
+
+func (q *Queries) GetBranchByTeamRepoAndName(ctx context.Context, arg GetBranchByTeamRepoAndNameParams) (Branch, error) {
+	row := q.db.QueryRowContext(ctx, getBranchByTeamRepoAndName, arg.TeamID, arg.RepoUri, arg.BranchName)
+	var i Branch
+	err := row.Scan(
+		&i.ID,
+		&i.TeamID,
+		&i.RepoUri,
+		&i.BranchName,
+		&i.LastSeenCommit,
+		&i.InsertedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getFeatureBranchRef = `-- name: GetFeatureBranchRef :one
 SELECT id, branch_id, feature_name, refs, "commit", pushed_at, inserted_at, updated_at
 FROM feature_branch_refs
@@ -322,6 +389,60 @@ func (q *Queries) PickRefsBranchForFeature(ctx context.Context, arg PickRefsBran
 	return i, err
 }
 
+const updateBranchLastSeenCommit = `-- name: UpdateBranchLastSeenCommit :exec
+UPDATE branches
+SET last_seen_commit = ?, updated_at = ?
+WHERE id = ?
+`
+
+type UpdateBranchLastSeenCommitParams struct {
+	LastSeenCommit string
+	UpdatedAt      string
+	ID             string
+}
+
+func (q *Queries) UpdateBranchLastSeenCommit(ctx context.Context, arg UpdateBranchLastSeenCommitParams) error {
+	_, err := q.db.ExecContext(ctx, updateBranchLastSeenCommit, arg.LastSeenCommit, arg.UpdatedAt, arg.ID)
+	return err
+}
+
+const upsertFeatureBranchRef = `-- name: UpsertFeatureBranchRef :exec
+INSERT INTO feature_branch_refs (
+  id, branch_id, feature_name, refs, "commit", pushed_at, inserted_at, updated_at
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(branch_id, feature_name) DO UPDATE
+SET refs = excluded.refs,
+    "commit" = excluded."commit",
+    pushed_at = excluded.pushed_at,
+    updated_at = excluded.updated_at
+`
+
+type UpsertFeatureBranchRefParams struct {
+	ID          string
+	BranchID    string
+	FeatureName string
+	Refs        string
+	Commit      string
+	PushedAt    string
+	InsertedAt  string
+	UpdatedAt   string
+}
+
+func (q *Queries) UpsertFeatureBranchRef(ctx context.Context, arg UpsertFeatureBranchRefParams) error {
+	_, err := q.db.ExecContext(ctx, upsertFeatureBranchRef,
+		arg.ID,
+		arg.BranchID,
+		arg.FeatureName,
+		arg.Refs,
+		arg.Commit,
+		arg.PushedAt,
+		arg.InsertedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
 const upsertFeatureImplState = `-- name: UpsertFeatureImplState :exec
 INSERT INTO feature_impl_states (id, implementation_id, feature_name, states, inserted_at, updated_at)
 VALUES (?, ?, ?, ?, ?, ?)
@@ -347,6 +468,104 @@ func (q *Queries) UpsertFeatureImplState(ctx context.Context, arg UpsertFeatureI
 		arg.ImplementationID,
 		arg.FeatureName,
 		arg.States,
+		arg.InsertedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const upsertSpec = `-- name: UpsertSpec :one
+INSERT INTO specs (
+  id, product_id, branch_id, path, last_seen_commit, parsed_at,
+  feature_name, feature_description, feature_version, raw_content, requirements,
+  inserted_at, updated_at
+)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(branch_id, feature_name) DO UPDATE
+SET path = excluded.path,
+    last_seen_commit = excluded.last_seen_commit,
+    parsed_at = excluded.parsed_at,
+    feature_description = excluded.feature_description,
+    feature_version = excluded.feature_version,
+    raw_content = excluded.raw_content,
+    requirements = excluded.requirements,
+    updated_at = excluded.updated_at
+RETURNING id, product_id, branch_id, path, last_seen_commit, parsed_at, feature_name, feature_description, feature_version, raw_content, requirements, inserted_at, updated_at
+`
+
+type UpsertSpecParams struct {
+	ID                 string
+	ProductID          string
+	BranchID           string
+	Path               *string
+	LastSeenCommit     string
+	ParsedAt           string
+	FeatureName        string
+	FeatureDescription *string
+	FeatureVersion     string
+	RawContent         *string
+	Requirements       string
+	InsertedAt         string
+	UpdatedAt          string
+}
+
+// Returns the inserted/updated spec row. The `xmax` trick used in Postgres
+// doesn't work in SQLite; we use the changes() function indirectly by checking
+// whether the row existed before. Caller decides created-vs-updated.
+func (q *Queries) UpsertSpec(ctx context.Context, arg UpsertSpecParams) (Spec, error) {
+	row := q.db.QueryRowContext(ctx, upsertSpec,
+		arg.ID,
+		arg.ProductID,
+		arg.BranchID,
+		arg.Path,
+		arg.LastSeenCommit,
+		arg.ParsedAt,
+		arg.FeatureName,
+		arg.FeatureDescription,
+		arg.FeatureVersion,
+		arg.RawContent,
+		arg.Requirements,
+		arg.InsertedAt,
+		arg.UpdatedAt,
+	)
+	var i Spec
+	err := row.Scan(
+		&i.ID,
+		&i.ProductID,
+		&i.BranchID,
+		&i.Path,
+		&i.LastSeenCommit,
+		&i.ParsedAt,
+		&i.FeatureName,
+		&i.FeatureDescription,
+		&i.FeatureVersion,
+		&i.RawContent,
+		&i.Requirements,
+		&i.InsertedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const upsertTrackedBranch = `-- name: UpsertTrackedBranch :exec
+INSERT INTO tracked_branches (implementation_id, branch_id, repo_uri, inserted_at, updated_at)
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(implementation_id, branch_id) DO NOTHING
+`
+
+type UpsertTrackedBranchParams struct {
+	ImplementationID string
+	BranchID         string
+	RepoUri          string
+	InsertedAt       string
+	UpdatedAt        string
+}
+
+func (q *Queries) UpsertTrackedBranch(ctx context.Context, arg UpsertTrackedBranchParams) error {
+	_, err := q.db.ExecContext(ctx, upsertTrackedBranch,
+		arg.ImplementationID,
+		arg.BranchID,
+		arg.RepoUri,
 		arg.InsertedAt,
 		arg.UpdatedAt,
 	)
