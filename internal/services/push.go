@@ -142,14 +142,72 @@ func (s *PushService) Execute(ctx context.Context, req PushRequest) (*PushResult
 
 	result := &PushResult{Branch: branch, Warnings: []string{}}
 
-	// --- 2. Process specs ---
+	// --- 2. Process specs and resolve the request product ---
+	// push.NEW_IMPLS.4: a single push targets exactly one product.
+	// push.VALIDATION.6: when both specs and product_name are present they must agree.
+	requestProduct, err := s.processSpecsAndResolveProduct(ctx, req, branch, result)
+	if err != nil {
+		return nil, err
+	}
+	if requestProduct != nil {
+		result.Product = requestProduct
+	}
+
+	// --- 3. Resolve implementation context ---
+	// Only when we have something to do for an impl: either specs (NEW_IMPLS.1)
+	// or refs (LINK_IMPLS / EXISTING_IMPLS / inference). Refs-only without any
+	// impl signals is allowed to leave the branch untracked (REFS.7).
+	if len(req.Specs) > 0 || req.References != nil {
+		impl, prod, err := s.resolveImpl(ctx, req, branch, requestProduct, len(req.Specs) > 0)
+		if err != nil {
+			return nil, err
+		}
+		if impl != nil {
+			result.Implementation = impl
+			if prod != nil {
+				result.Product = prod
+			}
+			// Track branch ↔ impl (idempotent — push.IDEMPOTENCY.1).
+			if err := s.specs.UpsertTrackedBranch(ctx, impl.ID, branch.ID, req.RepoURI); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	// --- 4. Process references ---
+	if req.References != nil {
+		byFeature := groupRefsByFeature(req.References.Data)
+		for featureName, featureRefs := range byFeature {
+			if err := s.specs.UpsertFeatureBranchRef(ctx, branch.ID, featureName, featureRefs, req.CommitHash, req.References.Override); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// processSpecsAndResolveProduct upserts each spec, creating products on demand,
+// while validating push.NEW_IMPLS.4 (single product per push) and
+// push.VALIDATION.6 (specs' product matches product_name when both given).
+// Returns the resolved request product (or nil for refs-only without product_name).
+func (s *PushService) processSpecsAndResolveProduct(
+	ctx context.Context, req PushRequest, branch *specs.Branch, result *PushResult,
+) (*products.Product, error) {
+	var requestProduct *products.Product
+
 	for _, sp := range req.Specs {
 		prod, err := s.products.GetOrCreate(ctx, req.Team.ID, sp.FeatureProduct)
 		if err != nil {
 			return nil, err
 		}
-		if result.Product == nil {
-			result.Product = prod
+
+		if requestProduct == nil {
+			requestProduct = prod
+		} else if requestProduct.ID != prod.ID {
+			// push.NEW_IMPLS.4
+			return nil, fmt.Errorf("%w: specs span multiple products (%q and %q); split into separate pushes",
+				ErrInvalidRequest, requestProduct.Name, prod.Name)
 		}
 
 		var pathPtr *string
@@ -178,119 +236,197 @@ func (s *PushService) Execute(ctx context.Context, req PushRequest) (*PushResult
 		}
 	}
 
-	// --- 3. Process references ---
-	if req.References != nil {
-		// Resolve the target impl using whichever info we have:
-		//   • If product_name AND target_impl_name are both set → explicit path
-		//     (with parent_impl_name auto-create).
-		//   • Otherwise → infer from tracked_branches for this branch.
-		var prod *products.Product
-		var impl *implementations.Implementation
+	// push.VALIDATION.6: specs and product_name must agree when both present.
+	if requestProduct != nil && req.ProductName != nil && *req.ProductName != requestProduct.Name {
+		return nil, fmt.Errorf("%w: product_name %q does not match specs' feature.product %q",
+			ErrInvalidRequest, *req.ProductName, requestProduct.Name)
+	}
 
-		if req.ProductName != nil && req.TargetImplName != nil {
-			// Explicit path: caller supplied both product + target.
-			var err error
-			prod, err = s.products.GetByTeamAndName(ctx, req.Team.ID, *req.ProductName)
-			if err != nil {
-				if products.IsNotFound(err) {
-					return nil, ErrProductNotFound
-				}
-				return nil, err
+	// Refs-only path: look up the explicit product when no specs supplied it.
+	if requestProduct == nil && req.ProductName != nil {
+		p, err := s.products.GetByTeamAndName(ctx, req.Team.ID, *req.ProductName)
+		if err != nil {
+			if products.IsNotFound(err) {
+				return nil, ErrProductNotFound
 			}
+			return nil, err
+		}
+		requestProduct = p
+	}
 
-			impl, err = s.impls.GetByProductAndName(ctx, prod.ID, *req.TargetImplName)
-			if err != nil {
-				if !implementations.IsNotFound(err) {
-					return nil, err
-				}
-				// Implementation not found — try parent-based child creation.
-				if req.ParentImplName == nil {
-					return nil, fmt.Errorf("%w: implementation %q not found (and no parent_impl_name to create child from)", ErrInvalidRequest, *req.TargetImplName)
-				}
-				parent, perr := s.impls.GetByProductAndName(ctx, prod.ID, *req.ParentImplName)
-				if perr != nil {
-					if implementations.IsNotFound(perr) {
-						return nil, fmt.Errorf("%w: parent_impl_name %q not found", ErrInvalidRequest, *req.ParentImplName)
-					}
-					return nil, perr
-				}
-				// Create the child implementation.
-				impl, err = s.impls.Create(ctx, implementations.CreateImplementationParams{
-					ProductID:              prod.ID,
-					TeamID:                 req.Team.ID,
-					Name:                   *req.TargetImplName,
-					ParentImplementationID: &parent.ID,
-				})
-				if err != nil {
-					return nil, err
+	return requestProduct, nil
+}
+
+// resolveImpl picks (or creates) the implementation context for this push,
+// following push.feature.yaml semantics:
+//
+//   - push.EXISTING_IMPLS.1 / .2 / .3 / .4: when the branch is already tracked
+//   - push.NEW_IMPLS.1 / .1-1: auto-create on specs push to untracked branch
+//   - push.NEW_IMPLS.6: refs-only child impl creation
+//   - push.LINK_IMPLS.1 / .5: link untracked branch to existing impl
+//   - push.PARENTS.1 / .3: parent inheritance
+//
+// product may be nil for refs-only pushes without product context. In that
+// case only inference from tracked_branches applies. Returns (impl, product,
+// error). product is the impl's product (it may be inferred from the impl
+// when the request did not carry one). A nil impl with nil error means
+// "no impl context" — refs may still be written without linkage (REFS.7).
+//
+//nolint:gocognit,gocyclo,cyclop // single-purpose decision tree, factoring would obscure the spec mapping
+func (s *PushService) resolveImpl(
+	ctx context.Context,
+	req PushRequest,
+	branch *specs.Branch,
+	product *products.Product,
+	hasSpecs bool,
+) (*implementations.Implementation, *products.Product, error) {
+	tracked, err := s.impls.ListTrackingBranch(ctx, req.Team.ID, branch.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// === Branch already tracked ===
+	if len(tracked) > 0 {
+		// When we know the request product, restrict candidates to it; otherwise
+		// fall back to the cross-product set (the inference path).
+		candidates := tracked
+		if product != nil {
+			filtered := make([]*implementations.Implementation, 0, len(tracked))
+			for _, t := range tracked {
+				if t.ProductID == product.ID {
+					filtered = append(filtered, t)
 				}
 			}
-		} else {
-			// Inference path: look up impls that track this branch.
-			tracked, err := s.impls.ListTrackingBranch(ctx, req.Team.ID, branch.ID)
-			if err != nil {
-				return nil, err
-			}
-			switch len(tracked) {
-			case 0:
-				// No impl tracks this branch — write refs but no impl linkage.
-				impl = nil
-				prod = nil
-			case 1:
-				impl = tracked[0]
-				p, err := s.products.GetByTeamAndName(ctx, req.Team.ID, impl.ProductName)
-				if err != nil {
-					return nil, err
-				}
-				prod = p
-			default:
-				// Multiple impls track this branch — caller must disambiguate.
-				if req.TargetImplName == nil {
-					names := make([]string, 0, len(tracked))
-					for _, t := range tracked {
-						names = append(names, t.Name)
-					}
-					return nil, fmt.Errorf("%w: branch is tracked by multiple implementations (%s); provide target_impl_name",
-						ErrInvalidRequest, strings.Join(names, ", "))
-				}
-				// Match by name among tracking impls.
-				for _, t := range tracked {
-					if t.Name == *req.TargetImplName {
-						impl = t
-						break
-					}
-				}
-				if impl == nil {
-					return nil, fmt.Errorf("%w: target_impl_name %q not found among tracking implementations",
-						ErrInvalidRequest, *req.TargetImplName)
-				}
-				p, err := s.products.GetByTeamAndName(ctx, req.Team.ID, impl.ProductName)
-				if err != nil {
-					return nil, err
-				}
-				prod = p
-			}
+			candidates = filtered
 		}
 
-		if impl != nil {
-			result.Implementation = impl
-			result.Product = prod
-			// Track branch ↔ impl (idempotent).
-			if err := s.specs.UpsertTrackedBranch(ctx, impl.ID, branch.ID, req.RepoURI); err != nil {
-				return nil, err
+		switch len(candidates) {
+		case 0:
+			// Branch tracked by impls in other products only. Treat as
+			// "untracked in this product" and fall through to creation/linking.
+		case 1:
+			impl := candidates[0]
+			// push.EXISTING_IMPLS.4
+			if req.TargetImplName != nil && *req.TargetImplName != impl.Name {
+				return nil, nil, fmt.Errorf("%w: branch is already tracked by implementation %q (cannot retarget to %q); to re-link, use the frontend",
+					ErrInvalidRequest, impl.Name, *req.TargetImplName)
 			}
-		}
-
-		// Group refs by feature name and upsert each feature row.
-		byFeature := groupRefsByFeature(req.References.Data)
-		for featureName, featureRefs := range byFeature {
-			if err := s.specs.UpsertFeatureBranchRef(ctx, branch.ID, featureName, featureRefs, req.CommitHash, req.References.Override); err != nil {
-				return nil, err
+			p, err := s.resolveProductForImpl(ctx, req.Team.ID, product, impl)
+			if err != nil {
+				return nil, nil, err
 			}
+			return impl, p, nil
+		default:
+			// push.EXISTING_IMPLS.2 / .3
+			if req.TargetImplName == nil {
+				names := make([]string, 0, len(candidates))
+				for _, t := range candidates {
+					names = append(names, t.Name)
+				}
+				return nil, nil, fmt.Errorf("%w: branch is tracked by multiple implementations (%s); provide target_impl_name",
+					ErrInvalidRequest, strings.Join(names, ", "))
+			}
+			for _, t := range candidates {
+				if t.Name == *req.TargetImplName {
+					p, err := s.resolveProductForImpl(ctx, req.Team.ID, product, t)
+					if err != nil {
+						return nil, nil, err
+					}
+					return t, p, nil
+				}
+			}
+			return nil, nil, fmt.Errorf("%w: target_impl_name %q not found among tracking implementations",
+				ErrInvalidRequest, *req.TargetImplName)
 		}
 	}
 
-	return result, nil
+	// === Branch not tracked (in this product) ===
+
+	// Without a product context we cannot create or look up impls; the
+	// inference path above already handled the cross-product case.
+	if product == nil {
+		return nil, nil, nil
+	}
+
+	// push.NEW_IMPLS.1-1: implementation name = target_impl_name OR branch_name.
+	implName := req.BranchName
+	if req.TargetImplName != nil {
+		implName = *req.TargetImplName
+	}
+
+	existing, err := s.impls.GetByProductAndName(ctx, product.ID, implName)
+	if err != nil && !implementations.IsNotFound(err) {
+		return nil, nil, err
+	}
+
+	if existing != nil {
+		// push.LINK_IMPLS.4: parent_impl_name + same-name impl → never links.
+		// Treat as a name collision (push.NEW_IMPLS.5 / push.LINK_IMPLS.5).
+		if req.ParentImplName != nil {
+			return nil, nil, fmt.Errorf("%w: implementation %q already exists in product %q; cannot create child with the same name (provide a different target_impl_name)",
+				ErrInvalidRequest, implName, product.Name)
+		}
+		// push.LINK_IMPLS.1: link untracked branch to existing impl.
+		// (NOTE: the LINK_IMPLS.1.4 condition — "that impl does not already
+		// track a branch in this repo_uri" — is intentionally not enforced
+		// here; for MVP we link via UpsertTrackedBranch idempotently. A
+		// stricter check can be added later without breaking callers.)
+		return existing, product, nil
+	}
+
+	// No existing impl with this name in product.
+
+	if !hasSpecs {
+		// Refs-only path: creation requires explicit target_impl_name AND
+		// parent_impl_name (push.NEW_IMPLS.6 / push.LINK_IMPLS.5).
+		if req.ParentImplName == nil {
+			if req.TargetImplName != nil {
+				return nil, nil, fmt.Errorf("%w: implementation %q not found in product %q (and no parent_impl_name to create child from)",
+					ErrInvalidRequest, implName, product.Name)
+			}
+			// Refs-only without any impl signals: leave branch untracked (REFS.7).
+			return nil, product, nil
+		}
+		// Refs-only + parent_impl_name → creation falls through.
+	}
+
+	// push.NEW_IMPLS.1 (specs) or push.NEW_IMPLS.6 (refs-only with parent).
+	var parentID *string
+	if req.ParentImplName != nil {
+		parent, err := s.impls.GetByProductAndName(ctx, product.ID, *req.ParentImplName)
+		if err != nil {
+			if implementations.IsNotFound(err) {
+				// push.PARENTS.3
+				return nil, nil, fmt.Errorf("%w: parent_impl_name %q not found in product %q",
+					ErrInvalidRequest, *req.ParentImplName, product.Name)
+			}
+			return nil, nil, err
+		}
+		parentID = &parent.ID
+	}
+
+	newImpl, err := s.impls.Create(ctx, implementations.CreateImplementationParams{
+		ProductID:              product.ID,
+		TeamID:                 req.Team.ID,
+		Name:                   implName,
+		ParentImplementationID: parentID,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return newImpl, product, nil
+}
+
+// resolveProductForImpl returns product if non-nil, otherwise looks up the
+// impl's product by name. Used when the inference path needs to fill in the
+// product after picking an impl from tracked_branches.
+func (s *PushService) resolveProductForImpl(
+	ctx context.Context, teamID string, product *products.Product, impl *implementations.Implementation,
+) (*products.Product, error) {
+	if product != nil {
+		return product, nil
+	}
+	return s.products.GetByTeamAndName(ctx, teamID, impl.ProductName)
 }
 
 // requirementsToMap translates RequirementInput → map[string]specs.Requirement.
