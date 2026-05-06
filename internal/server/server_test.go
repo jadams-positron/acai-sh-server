@@ -48,11 +48,11 @@ func newTestServer(t *testing.T) (*server.Server, *store.DB) {
 	}
 	logger := ops.SetupLogger(cfg, io.Discard)
 	repo := accounts.NewRepository(db)
-	sessionManager := auth.NewSessionManager(db, false)
+	sessionStore := auth.NewSessionStore(cfg.SecretKeyBase, false)
 	mlSvc := auth.NewMagicLinkService(repo, "http://localhost")
 	authDeps := &handlers.AuthDeps{
 		Logger:    logger,
-		Sessions:  sessionManager,
+		Sessions:  sessionStore,
 		Accounts:  repo,
 		MagicLink: mlSvc,
 		Mailer:    mail.NewNoop(logger),
@@ -60,10 +60,9 @@ func newTestServer(t *testing.T) (*server.Server, *store.DB) {
 
 	srv, err := server.New(cfg, logger, &server.RouterDeps{
 		DB:              db,
-		Sessions:        sessionManager,
+		Sessions:        sessionStore,
 		Accounts:        repo,
 		AuthHandlerDeps: authDeps,
-		CSRFKey:         []byte(cfg.SecretKeyBase[:32]),
 		SecureCookie:    false,
 		Version:         "test-version",
 		Teams:           teams.NewRepository(db),

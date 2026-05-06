@@ -4,65 +4,92 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"testing"
+
+	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
-func TestRequireAuth_RedirectsAnonymous(t *testing.T) {
-	handler := auth.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Errorf("downstream handler should not have been called")
-	}))
+func newDB(t *testing.T) *store.DB {
+	t.Helper()
+	dir := t.TempDir()
+	db, err := store.Open(filepath.Join(dir, "test.db"))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := store.RunMigrations(context.Background(), db); err != nil {
+		t.Fatalf("RunMigrations: %v", err)
+	}
+	return db
+}
 
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/teams", http.NoBody)
+func newCtxWithScope(t *testing.T, scope *auth.Scope) (echo.Context, *httptest.ResponseRecorder) {
+	t.Helper()
+	e := echo.New()
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
 	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
+	c := e.NewContext(req, rec)
+	if scope != nil {
+		c.Set("acai.scope", scope)
+	}
+	return c, rec
+}
 
+func TestRequireAuth_RedirectsAnonymous(t *testing.T) {
+	c, rec := newCtxWithScope(t, nil)
+	called := false
+	h := auth.RequireAuth(func(c echo.Context) error {
+		called = true
+		return c.NoContent(http.StatusOK)
+	})
+	if err := h(c); err != nil {
+		t.Fatalf("h: %v", err)
+	}
 	if rec.Code != http.StatusSeeOther {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+		t.Errorf("status = %d, want 303", rec.Code)
 	}
 	if loc := rec.Header().Get("Location"); loc != "/users/log-in" {
-		t.Errorf("Location = %q, want /users/log-in", loc)
+		t.Errorf("Location = %q", loc)
+	}
+	if called {
+		t.Errorf("downstream should not have been called")
 	}
 }
 
 func TestRequireAuth_AllowsAuthenticated(t *testing.T) {
+	c, rec := newCtxWithScope(t, &auth.Scope{User: &accounts.User{ID: "u1"}})
 	called := false
-	handler := auth.RequireAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	h := auth.RequireAuth(func(c echo.Context) error {
 		called = true
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/teams", http.NoBody)
-	ctx := auth.WithScope(req.Context(), &auth.Scope{User: &accounts.User{ID: "u1"}})
-	req = req.WithContext(ctx)
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-
-	if !called {
-		t.Errorf("downstream handler not called")
+		return c.NoContent(http.StatusOK)
+	})
+	if err := h(c); err != nil {
+		t.Fatalf("h: %v", err)
 	}
-	if rec.Code != http.StatusOK {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusOK)
+	if !called || rec.Code != http.StatusOK {
+		t.Errorf("called=%v code=%d", called, rec.Code)
 	}
 }
 
 func TestRedirectIfAuth_RedirectsAuthenticated(t *testing.T) {
-	handler := auth.RedirectIfAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Errorf("downstream handler should not have been called")
-	}))
-
-	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/users/log-in", http.NoBody)
-	ctx := auth.WithScope(req.Context(), &auth.Scope{User: &accounts.User{ID: "u1"}})
-	req = req.WithContext(ctx)
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusSeeOther {
-		t.Errorf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	c, rec := newCtxWithScope(t, &auth.Scope{User: &accounts.User{ID: "u1"}})
+	called := false
+	h := auth.RedirectIfAuth(func(c echo.Context) error {
+		called = true
+		return c.NoContent(http.StatusOK)
+	})
+	if err := h(c); err != nil {
+		t.Fatalf("h: %v", err)
 	}
-	if loc := rec.Header().Get("Location"); loc != "/teams" {
-		t.Errorf("Location = %q, want /teams", loc)
+	if rec.Code != http.StatusSeeOther {
+		t.Errorf("status = %d, want 303", rec.Code)
+	}
+	if called {
+		t.Errorf("downstream should not have been called")
 	}
 }

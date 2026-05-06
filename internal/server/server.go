@@ -1,4 +1,4 @@
-// Package server owns the HTTP listener and chi router lifecycle.
+// Package server owns the HTTP listener and echo lifecycle.
 package server
 
 import (
@@ -11,24 +11,28 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/alexedwards/scs/v2"
+	"github.com/labstack/echo/v4"
+	echomiddleware "github.com/labstack/echo/v4/middleware"
 
+	"github.com/jadams-positron/acai-sh-server/internal/api"
 	apimiddleware "github.com/jadams-positron/acai-sh-server/internal/api/middleware"
 	"github.com/jadams-positron/acai-sh-server/internal/api/operations"
+	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/config"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+	"github.com/jadams-positron/acai-sh-server/internal/ops"
+	"github.com/jadams-positron/acai-sh-server/internal/site"
 	"github.com/jadams-positron/acai-sh-server/internal/site/handlers"
 	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
-// RouterDeps groups everything newRouter needs.
+// RouterDeps groups everything New needs.
 type RouterDeps struct {
 	DB              *store.DB
-	Sessions        *scs.SessionManager
+	Sessions        *auth.SessionStore
 	Accounts        *accounts.Repository
 	AuthHandlerDeps *handlers.AuthDeps
-	CSRFKey         []byte
 	SecureCookie    bool
 	Version         string
 	Teams           *teams.Repository
@@ -42,7 +46,7 @@ type Server struct {
 	logger  *slog.Logger
 	db      *store.DB
 	version string
-	http    *http.Server
+	echo    *echo.Echo
 }
 
 // New constructs a *Server with all dependencies wired.
@@ -57,63 +61,74 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		return nil, errors.New("server: deps with DB are required")
 	}
 
-	router := newRouter(deps)
+	e := echo.New()
+	e.HideBanner = true
+	e.HidePort = true
+	e.Use(echomiddleware.RequestID())
+	e.Use(echomiddleware.Recover())
 
-	httpServer := &http.Server{
-		Handler:           router,
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
-	}
+	// CSRF middleware — used selectively on browser routes via a Group.
+	csrfMW := echomiddleware.CSRFWithConfig(echomiddleware.CSRFConfig{
+		TokenLookup:    "form:gorilla.csrf.Token",
+		CookieName:     "_acai_csrf",
+		CookieHTTPOnly: true,
+		CookieSecure:   deps.SecureCookie,
+		CookieSameSite: http.SameSiteLaxMode,
+	})
 
-	return &Server{
-		cfg:     cfg,
-		logger:  logger,
-		db:      deps.DB,
-		version: deps.Version,
-		http:    httpServer,
-	}, nil
+	// Browser group: load scope, then individual route groups apply csrf as needed.
+	browser := e.Group("", auth.LoadScope(deps.Sessions, deps.Accounts))
+	site.MountAuthRoutes(browser, deps.AuthHandlerDeps, csrfMW)
+	site.MountAuthRequiredStub(browser, csrfMW)
+
+	// Static assets — public, no session.
+	handlers.MountStatic(e.Group(""))
+
+	// Health check — outside session middleware.
+	e.GET("/_health", ops.HealthHandlerEcho(deps.DB, deps.Version))
+
+	// API tree — bearer auth applied inside Mount.
+	api.Mount(e, &api.Deps{
+		Teams:      deps.Teams,
+		Operations: deps.Operations,
+		Limiter:    deps.APILimiter,
+	})
+
+	return &Server{cfg: cfg, logger: logger, db: deps.DB, version: deps.Version, echo: e}, nil
 }
 
 // Handler returns the underlying HTTP handler. Useful for httptest.NewServer.
-func (s *Server) Handler() http.Handler { return s.http.Handler }
+func (s *Server) Handler() http.Handler { return s.echo }
 
 // Run starts the listener on cfg.HTTPPort and blocks until ctx is canceled.
 func (s *Server) Run(ctx context.Context, addrCh chan<- string) error {
 	addr := net.JoinHostPort("0.0.0.0", strconv.Itoa(s.cfg.HTTPPort))
-	lc := &net.ListenConfig{}
-	ln, err := lc.Listen(ctx, "tcp", addr)
+	ln, err := (&net.ListenConfig{}).Listen(ctx, "tcp", addr)
 	if err != nil {
-		return fmt.Errorf("server: listen %s: %w", addr, err)
+		return fmt.Errorf("server: listen: %w", err)
 	}
-
 	if addrCh != nil {
 		select {
 		case addrCh <- ln.Addr().String():
 		default:
 		}
 	}
-
 	s.logger.Info("server starting", slog.String("addr", ln.Addr().String()), slog.String("version", s.version))
-
+	s.echo.Listener = ln
 	errCh := make(chan error, 1)
 	go func() {
-		if err := s.http.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := s.echo.Start(""); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 			return
 		}
 		errCh <- nil
 	}()
-
 	select {
 	case <-ctx.Done():
 		s.logger.Info("server stopping")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if err := s.http.Shutdown(shutdownCtx); err != nil {
-			return fmt.Errorf("server: shutdown: %w", err)
-		}
+		_ = s.echo.Shutdown(shutCtx)
 		<-errCh
 		return nil
 	case err := <-errCh:

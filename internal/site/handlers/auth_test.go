@@ -12,8 +12,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gorilla/csrf"
-
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/config"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
@@ -62,12 +60,12 @@ func TestLogin_FullMagicLinkFlow(t *testing.T) {
 		MailFromEmail: "test@acai.test",
 	}
 	logger := ops.SetupLogger(cfg, io.Discard)
-	sessionManager := auth.NewSessionManager(db, false)
+	sessionStore := auth.NewSessionStore(cfg.SecretKeyBase, false)
 	mlSvc := auth.NewMagicLinkService(repo, "http://localhost")
 	mailer := &captureMailer{}
 	authDeps := &handlers.AuthDeps{
 		Logger:    logger,
-		Sessions:  sessionManager,
+		Sessions:  sessionStore,
 		Accounts:  repo,
 		MagicLink: mlSvc,
 		Mailer:    mailer,
@@ -77,10 +75,9 @@ func TestLogin_FullMagicLinkFlow(t *testing.T) {
 
 	srv, err := server.New(cfg, logger, &server.RouterDeps{
 		DB:              db,
-		Sessions:        sessionManager,
+		Sessions:        sessionStore,
 		Accounts:        repo,
 		AuthHandlerDeps: authDeps,
-		CSRFKey:         []byte(cfg.SecretKeyBase[:32]),
 		SecureCookie:    false,
 		Version:         "test",
 	})
@@ -88,12 +85,7 @@ func TestLogin_FullMagicLinkFlow(t *testing.T) {
 		t.Fatalf("server.New: %v", err)
 	}
 
-	// Wrap the handler so gorilla/csrf knows this is a plain-HTTP test server,
-	// which skips the TLS-only Referer/Origin enforcement.
-	plaintextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		srv.Handler().ServeHTTP(w, csrf.PlaintextHTTPRequest(r))
-	})
-	ts := httptest.NewServer(plaintextHandler)
+	ts := httptest.NewServer(srv.Handler())
 	defer ts.Close()
 
 	jar, _ := cookiejar.New(nil)
@@ -193,12 +185,12 @@ func TestRegister_FullFlowMarksUserConfirmed(t *testing.T) {
 		MailFromEmail: "test@acai.test",
 	}
 	logger := ops.SetupLogger(cfg, io.Discard)
-	sessionManager := auth.NewSessionManager(db, false)
+	sessionStore := auth.NewSessionStore(cfg.SecretKeyBase, false)
 	mlSvc := auth.NewMagicLinkService(repo, "http://localhost")
 	mailer := &captureMailer{}
 	authDeps := &handlers.AuthDeps{
 		Logger:    logger,
-		Sessions:  sessionManager,
+		Sessions:  sessionStore,
 		Accounts:  repo,
 		MagicLink: mlSvc,
 		Mailer:    mailer,
@@ -208,10 +200,9 @@ func TestRegister_FullFlowMarksUserConfirmed(t *testing.T) {
 
 	srv, err := server.New(cfg, logger, &server.RouterDeps{
 		DB:              db,
-		Sessions:        sessionManager,
+		Sessions:        sessionStore,
 		Accounts:        repo,
 		AuthHandlerDeps: authDeps,
-		CSRFKey:         []byte(cfg.SecretKeyBase[:32]),
 		SecureCookie:    false,
 		Version:         "test",
 	})
@@ -219,10 +210,7 @@ func TestRegister_FullFlowMarksUserConfirmed(t *testing.T) {
 		t.Fatalf("server.New: %v", err)
 	}
 
-	plaintextHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		srv.Handler().ServeHTTP(w, csrf.PlaintextHTTPRequest(r))
-	})
-	ts := httptest.NewServer(plaintextHandler)
+	ts := httptest.NewServer(srv.Handler())
 	defer ts.Close()
 
 	jar, _ := cookiejar.New(nil)
@@ -275,7 +263,7 @@ func TestRegister_FullFlowMarksUserConfirmed(t *testing.T) {
 		t.Fatal("expected ConfirmedAt to be nil before consuming magic link")
 	}
 
-	// Step 4: GET the magic-link URL — rewrite host since mailer.url uses "http://localhost".
+	// Step 4: GET the magic-link URL.
 	confirmPath := strings.TrimPrefix(mailer.url, "http://localhost")
 	req3, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+confirmPath, http.NoBody)
 	resp, err = client.Do(req3)

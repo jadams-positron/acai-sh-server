@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/labstack/echo/v4"
+
 	"github.com/jadams-positron/acai-sh-server/internal/api/apierror"
 )
 
@@ -73,19 +75,18 @@ func (l *InProcessLimiter) pruneOlder(currentBucket int64) {
 
 // RateLimit returns middleware that consults limiter for each request, keyed
 // by the path + the authenticated token ID (or "anonymous").
-func RateLimit(specForPath func(path string) RateLimitSpec, limiter Limiter) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			spec := specForPath(r.URL.Path)
+func RateLimit(specForPath func(path string) RateLimitSpec, limiter Limiter) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			spec := specForPath(c.Request().URL.Path)
 			tokenID := "anonymous"
-			if t := TokenFrom(r.Context()); t != nil {
+			if t := TokenFromEcho(c); t != nil {
 				tokenID = t.ID
 			}
-			if !limiter.Allow(r.URL.Path, tokenID, spec, time.Now()) {
-				apierror.WriteAppError(w, http.StatusTooManyRequests, "Rate limit exceeded", "")
-				return
+			if !limiter.Allow(c.Request().URL.Path, tokenID, spec, time.Now()) {
+				return apierror.WriteAppErrorEcho(c, http.StatusTooManyRequests, "Rate limit exceeded", "")
 			}
-			next.ServeHTTP(w, r)
-		})
+			return next(c)
+		}
 	}
 }

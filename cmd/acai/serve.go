@@ -43,7 +43,7 @@ func runServe(ctx context.Context, stderr io.Writer) int {
 	teamsRepo := teams.NewRepository(db)
 	opsCfg := operations.Load(cfg.URLScheme == "http") // non-prod when plain HTTP
 	apiLimiter := middleware.NewInProcessLimiter()
-	sessionManager := auth.NewSessionManager(db, cfg.URLScheme == "https")
+	sessionStore := auth.NewSessionStore(cfg.SecretKeyBase, cfg.URLScheme == "https")
 
 	baseURL := cfg.URLScheme + "://" + cfg.URLHost
 	if cfg.HTTPPort != 80 && cfg.HTTPPort != 443 && cfg.URLHost == "localhost" {
@@ -55,7 +55,7 @@ func runServe(ctx context.Context, stderr io.Writer) int {
 
 	authDeps := &handlers.AuthDeps{
 		Logger:    logger,
-		Sessions:  sessionManager,
+		Sessions:  sessionStore,
 		Accounts:  repo,
 		MagicLink: mlSvc,
 		Mailer:    mailer,
@@ -65,10 +65,9 @@ func runServe(ctx context.Context, stderr io.Writer) int {
 
 	srv, err := server.New(cfg, logger, &server.RouterDeps{
 		DB:              db,
-		Sessions:        sessionManager,
+		Sessions:        sessionStore,
 		Accounts:        repo,
 		AuthHandlerDeps: authDeps,
-		CSRFKey:         []byte(cfg.SecretKeyBase[:32]),
 		SecureCookie:    cfg.URLScheme == "https",
 		Version:         version,
 		Teams:           teamsRepo,

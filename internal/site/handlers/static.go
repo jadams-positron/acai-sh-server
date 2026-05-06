@@ -1,23 +1,28 @@
 package handlers
 
 import (
+	"io/fs"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/assets"
 )
 
-// MountStatic registers the /_assets/* file-server route on r.
+// MountStatic registers the /_assets/* file-server route on g.
 // All assets are served with a 5-minute public cache header.
-// This must be mounted BEFORE session-loaded route groups so
-// browsers can fetch assets without a session cookie.
-func MountStatic(r chi.Router) {
-	fs := http.FileServerFS(assets.FS)
-	r.Get("/_assets/*", func(w http.ResponseWriter, r *http.Request) {
+func MountStatic(g *echo.Group) {
+	sub, err := fs.Sub(assets.FS, ".")
+	if err != nil {
+		panic("assets: fs.Sub: " + err.Error())
+	}
+	fileServer := http.FileServer(http.FS(sub))
+	g.GET("/_assets/*", echo.WrapHandler(http.StripPrefix("/_assets/", cacheHeaders(fileServer))))
+}
+
+func cacheHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "public, max-age=300")
-		// Strip the /_assets prefix so the FileServer sees the bare path
-		// (e.g. "js/datastar.min.js") rooted at the embedded FS.
-		http.StripPrefix("/_assets/", fs).ServeHTTP(w, r)
+		next.ServeHTTP(w, r)
 	})
 }
