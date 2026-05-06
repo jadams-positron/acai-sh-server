@@ -86,6 +86,7 @@ func TestShell_ActiveTeam_SidebarHasFullNav(t *testing.T) {
 		`href="/t/acme">Overview`,
 		`href="/t/acme/features">Features`,
 		`href="/t/acme/implementations">Implementations`,
+		`href="/t/acme/branches">Branches`,
 		`href="/t/acme/settings">Settings`,
 		`is-active" href="/t/acme/tokens">Tokens`, // active highlight
 	} {
@@ -122,6 +123,21 @@ func TestShell_FeaturesSectionHighlights(t *testing.T) {
 
 	if !strings.Contains(out, `is-active" href="/t/acme/features">Features`) {
 		t.Errorf("expected Features nav-item to be active; got:\n%s", out)
+	}
+}
+
+func TestShell_BranchesSectionHighlights(t *testing.T) {
+	t.Parallel()
+	team := &teams.Team{ID: "t1", Name: "acme"}
+	out := renderShell(t, views.ShellProps{
+		Title:         "Branches",
+		Teams:         []*teams.Team{team},
+		ActiveTeam:    team,
+		ActiveSection: "branches",
+	})
+
+	if !strings.Contains(out, `is-active" href="/t/acme/branches">Branches`) {
+		t.Errorf("expected Branches nav-item to be active; got:\n%s", out)
 	}
 }
 

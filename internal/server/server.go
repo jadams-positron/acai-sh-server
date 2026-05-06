@@ -140,6 +140,13 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Specs:    deps.Specs,
 	}
 	site.MountFeaturesIndexRoutes(browser, featuresIndexDeps, csrfMW)
+	branchesIndexDeps := &handlers.BranchesIndexDeps{
+		Logger:          logger,
+		Teams:           deps.Teams,
+		Specs:           deps.Specs,
+		Implementations: deps.Implementations,
+	}
+	site.MountBranchesIndexRoutes(browser, branchesIndexDeps, csrfMW)
 	teamSettingsDeps := &handlers.TeamSettingsDeps{
 		Logger:   logger,
 		Teams:    deps.Teams,
