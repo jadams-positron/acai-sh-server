@@ -1,0 +1,104 @@
+package views
+
+import (
+	"fmt"
+
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+	"github.com/jadams-positron/acai-sh-server/internal/services"
+)
+
+// FeatureShowProps drives the /t/{team}/f/{feature} page.
+type FeatureShowProps struct {
+	Team               *teams.Team
+	FeatureName        string
+	FeatureDescription string
+	Cards              []*services.ImplementationCard
+}
+
+templ FeatureShow(p FeatureShowProps) {
+	@Layout(p.FeatureName + " · " + p.Team.Name) {
+		<header class="page-header">
+			<p class="subtitle">
+				<a href="/teams">Teams</a>
+				{ " / " }
+				<a href={ templ.SafeURL("/t/" + p.Team.Name) }>{ p.Team.Name }</a>
+				{ " / " }
+				<span>{ p.FeatureName }</span>
+			</p>
+			<h1 class="title">{ p.FeatureName }</h1>
+			if p.FeatureDescription != "" {
+				<p class="subtitle">{ p.FeatureDescription }</p>
+			}
+		</header>
+
+		if len(p.Cards) == 0 {
+			<div class="empty-state">
+				<p>No implementations have this feature yet. Push specs/refs via <code>acai push</code>.</p>
+			</div>
+		} else {
+			<div style="display: grid; gap: var(--space-md);">
+				for _, card := range p.Cards {
+					@implCard(p.Team.Name, p.FeatureName, card)
+				}
+			</div>
+		}
+	}
+}
+
+templ implCard(teamName, featureName string, card *services.ImplementationCard) {
+	<a href={ templ.SafeURL("/t/" + teamName + "/i/" + card.ImplementationSlug + "/f/" + featureName) }
+		class="panel"
+		style="display: block; text-decoration: none; color: inherit;">
+		<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-md);">
+			<div>
+				<h3 style="margin: 0; font-size: var(--text-lg);">{ card.ImplementationName }</h3>
+				<p class="subtitle" style="margin: var(--space-xs) 0 0;">{ card.ProductName }</p>
+			</div>
+			<span style="font-size: var(--text-sm); color: var(--muted);">
+				{ fmt.Sprintf("%d requirements", card.TotalRequirements) }
+			</span>
+		</div>
+		@progressBar(card.Counts, card.TotalRequirements)
+		@statusLegend(card.Counts)
+	</a>
+}
+
+templ progressBar(c services.StatusCounts, total int) {
+	if total > 0 {
+		<div style="display: flex; height: 8px; border-radius: var(--radius-pill); overflow: hidden; background: var(--surface-inset);">
+			if c.Completed+c.Accepted > 0 {
+				<div style={ fmt.Sprintf("width: %.1f%%; background: var(--success);", percent(c.Completed+c.Accepted, total)) }></div>
+			}
+			if c.Blocked+c.Rejected > 0 {
+				<div style={ fmt.Sprintf("width: %.1f%%; background: var(--danger);", percent(c.Blocked+c.Rejected, total)) }></div>
+			}
+			if c.Assigned+c.Incomplete > 0 {
+				<div style={ fmt.Sprintf("width: %.1f%%; background: var(--accent);", percent(c.Assigned+c.Incomplete, total)) }></div>
+			}
+		</div>
+	}
+}
+
+templ statusLegend(c services.StatusCounts) {
+	<div style="display: flex; gap: var(--space-md); margin-top: var(--space-sm); font-size: var(--text-sm); color: var(--muted); flex-wrap: wrap;">
+		if c.Completed+c.Accepted > 0 {
+			<span><span style="color: var(--success);">●</span> { fmt.Sprintf("%d done", c.Completed+c.Accepted) }</span>
+		}
+		if c.Blocked+c.Rejected > 0 {
+			<span><span style="color: var(--danger);">●</span> { fmt.Sprintf("%d blocked", c.Blocked+c.Rejected) }</span>
+		}
+		if c.Assigned+c.Incomplete > 0 {
+			<span><span style="color: var(--accent);">●</span> { fmt.Sprintf("%d in progress", c.Assigned+c.Incomplete) }</span>
+		}
+		if c.Null > 0 {
+			<span>{ fmt.Sprintf("%d untouched", c.Null) }</span>
+		}
+	</div>
+}
+
+func percent(part, total int) float64 {
+	if total == 0 {
+		return 0
+	}
+	return float64(part) / float64(total) * 100
+}
