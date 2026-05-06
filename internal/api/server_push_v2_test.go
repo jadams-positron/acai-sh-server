@@ -397,3 +397,186 @@ func TestPush_RefsOnly_InferTargetImpl_MultiTracking_WithTarget(t *testing.T) {
 		t.Error("feature_branch_refs should be written for auth-feature")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// push.NEW_IMPLS.1 — auto-create impl when specs are pushed to untracked branch
+// ---------------------------------------------------------------------------
+
+// TestPush_SpecsToUntrackedBranch_AutoCreatesImpl is the bug-report scenario:
+// `acai push --all` from a fresh feature branch on a fresh server. The CLI
+// sends specs + refs without target_impl_name or parent_impl_name. Per
+// push.NEW_IMPLS.1 / .1-1 the server must auto-create an implementation named
+// after the branch and write a tracked_branches row so downstream reads work.
+func TestPush_SpecsToUntrackedBranch_AutoCreatesImpl(t *testing.T) {
+	fx := setupPush(t)
+
+	body := pushBody{
+		BranchName: "feature-x",
+		CommitHash: "abc1234",
+		RepoURI:    "github.com/test/fresh-repo",
+		Specs: []pushSpec{
+			{
+				Feature:      pushFeature{Name: "auth-feature", Product: "myproduct"},
+				Meta:         pushMeta{Path: "features/auth.yaml", LastSeenCommit: "abc1234"},
+				Requirements: map[string]pushReqDf{"auth-feature.AUTH.1": {Requirement: "Users can log in"}},
+			},
+		},
+		References: &refsPayload{
+			Data: map[string][]codeRefPayload{
+				"auth-feature.AUTH.1": {{Path: "lib/auth.go:42"}},
+			},
+		},
+	}
+
+	resp := fx.app.Client().WithBearer(fx.plaintext).POSTJSON("/api/v1/push", body)
+	resp.AssertStatus(http.StatusOK)
+
+	var doc pushResp
+	resp.JSON(&doc)
+
+	// push.NEW_IMPLS.1-1: implementation_name falls back to branch_name.
+	if doc.Data.ImplementationName == nil {
+		t.Fatal("implementation_name should be set after specs push to untracked branch")
+	}
+	if *doc.Data.ImplementationName != "feature-x" {
+		t.Errorf("implementation_name = %q, want %q (branch_name fallback)", *doc.Data.ImplementationName, "feature-x")
+	}
+	if doc.Data.ImplementationID == nil {
+		t.Fatal("implementation_id should be set")
+	}
+	if doc.Data.ProductName == nil || *doc.Data.ProductName != "myproduct" {
+		t.Errorf("product_name = %v, want myproduct", doc.Data.ProductName)
+	}
+
+	// Verify the impl row exists in DB under the correct product.
+	productID := readProductIDByName(t, fx, "myproduct")
+	if productID == "" {
+		t.Fatal("product not found in DB")
+	}
+	implID, parentID := readImplByName(t, fx, productID, "feature-x")
+	if implID == "" {
+		t.Fatal("impl row not created in DB")
+	}
+	if parentID != nil {
+		t.Errorf("parent_implementation_id = %v, want nil (no parent_impl_name in request)", parentID)
+	}
+
+	// Verify tracked_branches links the new impl to this branch.
+	branchID := readBranchID(t, fx.app.DB, fx.team.ID, "github.com/test/fresh-repo", "feature-x")
+	if !trackedBranchExists(t, fx.app.DB, implID, branchID) {
+		t.Error("tracked_branches row should exist for new impl ↔ branch")
+	}
+
+	// Refs should also be persisted under the branch.
+	refs := readFeatureRefs(t, fx.app.DB, branchID, "auth-feature")
+	if len(refs) == 0 {
+		t.Error("feature_branch_refs should be written")
+	}
+}
+
+// TestPush_SpecsToUntrackedBranch_UsesTargetImplNameOverBranch verifies
+// push.NEW_IMPLS.1-1: when target_impl_name is provided, it overrides the
+// branch_name fallback for the new impl's name.
+func TestPush_SpecsToUntrackedBranch_UsesTargetImplNameOverBranch(t *testing.T) {
+	fx := setupPush(t)
+
+	targetName := "explicit-impl-name"
+	body := pushBody{
+		BranchName:     "some-branch",
+		CommitHash:     "abc1234",
+		RepoURI:        "github.com/test/fresh-repo",
+		TargetImplName: &targetName,
+		Specs: []pushSpec{
+			{
+				Feature:      pushFeature{Name: "auth-feature", Product: "myproduct"},
+				Meta:         pushMeta{Path: "features/auth.yaml", LastSeenCommit: "abc1234"},
+				Requirements: map[string]pushReqDf{},
+			},
+		},
+	}
+
+	resp := fx.app.Client().WithBearer(fx.plaintext).POSTJSON("/api/v1/push", body)
+	resp.AssertStatus(http.StatusOK)
+
+	var doc pushResp
+	resp.JSON(&doc)
+	if doc.Data.ImplementationName == nil || *doc.Data.ImplementationName != targetName {
+		t.Errorf("implementation_name = %v, want %q", doc.Data.ImplementationName, targetName)
+	}
+}
+
+// TestPush_SpecsToTrackedBranch_ReusesExistingImpl verifies push.EXISTING_IMPLS.1:
+// when the branch is already tracked by an impl, a subsequent specs push reuses
+// that impl rather than creating a new one (idempotency for the bug-report
+// scenario where the user runs `acai push` twice in a row).
+func TestPush_SpecsToTrackedBranch_ReusesExistingImpl(t *testing.T) {
+	fx := setupPush(t)
+
+	body := pushBody{
+		BranchName: "feature-y",
+		CommitHash: "abc1234",
+		RepoURI:    "github.com/test/fresh-repo",
+		Specs: []pushSpec{
+			{
+				Feature:      pushFeature{Name: "auth-feature", Product: "myproduct"},
+				Meta:         pushMeta{Path: "features/auth.yaml", LastSeenCommit: "abc1234"},
+				Requirements: map[string]pushReqDf{},
+			},
+		},
+	}
+
+	// First push creates the impl.
+	resp1 := fx.app.Client().WithBearer(fx.plaintext).POSTJSON("/api/v1/push", body)
+	resp1.AssertStatus(http.StatusOK)
+	var doc1 pushResp
+	resp1.JSON(&doc1)
+	firstImplID := *doc1.Data.ImplementationID
+
+	// Second push must reuse the same impl.
+	resp2 := fx.app.Client().WithBearer(fx.plaintext).POSTJSON("/api/v1/push", body)
+	resp2.AssertStatus(http.StatusOK)
+	var doc2 pushResp
+	resp2.JSON(&doc2)
+	if doc2.Data.ImplementationID == nil || *doc2.Data.ImplementationID != firstImplID {
+		t.Errorf("second push impl_id = %v, want %q (idempotent)", doc2.Data.ImplementationID, firstImplID)
+	}
+
+	// Only one impl row should exist for ("myproduct", "feature-y").
+	productID := readProductIDByName(t, fx, "myproduct")
+	var count int
+	if err := fx.app.DB.Read.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM implementations WHERE product_id = ? AND name = ?",
+		productID, "feature-y").Scan(&count); err != nil {
+		t.Fatalf("DB count: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("impl count = %d, want 1 (no duplicate)", count)
+	}
+}
+
+// TestPush_SpecsSpanMultipleProducts_422 verifies push.NEW_IMPLS.4: a push that
+// includes specs in two different products is rejected.
+func TestPush_SpecsSpanMultipleProducts_422(t *testing.T) {
+	fx := setupPush(t)
+
+	body := pushBody{
+		BranchName: "feature-z",
+		CommitHash: "abc1234",
+		RepoURI:    "github.com/test/fresh-repo",
+		Specs: []pushSpec{
+			{
+				Feature:      pushFeature{Name: "auth-feature", Product: "product-a"},
+				Meta:         pushMeta{Path: "features/auth.yaml", LastSeenCommit: "abc1234"},
+				Requirements: map[string]pushReqDf{},
+			},
+			{
+				Feature:      pushFeature{Name: "billing-feature", Product: "product-b"},
+				Meta:         pushMeta{Path: "features/billing.yaml", LastSeenCommit: "abc1234"},
+				Requirements: map[string]pushReqDf{},
+			},
+		},
+	}
+
+	resp := fx.app.Client().WithBearer(fx.plaintext).POSTJSON("/api/v1/push", body)
+	resp.AssertStatus(http.StatusUnprocessableEntity)
+}
