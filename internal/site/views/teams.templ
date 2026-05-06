@@ -1,23 +1,85 @@
 package views
 
-// TeamsStubProps drives the P1d /teams stub page.
-type TeamsStubProps struct {
-	UserEmail string
-	CSRFToken string
+import "github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+
+// TeamsIndexProps drives the /teams page.
+type TeamsIndexProps struct {
+	Teams         []*teams.Team
+	CSRFToken     string
+	Flash         string // optional error message from a previous create attempt
+	PrefilledName string // if a previous create failed, repopulate the input
 }
 
-templ TeamsStub(p TeamsStubProps) {
+templ TeamsIndex(p TeamsIndexProps) {
 	@Layout("Teams") {
 		<header class="page-header">
 			<h1 class="title">Teams</h1>
-			<p class="subtitle">Logged in as <strong>{ p.UserEmail }</strong></p>
+			<p class="subtitle">Manage your teams and create new ones.</p>
 		</header>
-		<section class="panel">
-			<p>The real teams page lands in a later phase. This page exists to prove auth works end-to-end.</p>
-			<form method="post" action="/users/log-out" style="margin-top: var(--space-lg);">
-				<input type="hidden" name="gorilla.csrf.Token" value={ p.CSRFToken }/>
-				<button class="button button-ghost" type="submit">Log out</button>
-			</form>
-		</section>
+		if p.Flash != "" {
+			<div class="banner banner-error">{ p.Flash }</div>
+		}
+		<div data-signals="{showModal: false}" class="space-y-6">
+			<div style="display: flex; justify-content: flex-end; margin-bottom: var(--space-md);">
+				<button class="button button-primary" data-on-click="$showModal = true" type="button">
+					+ Create Team
+				</button>
+			</div>
+			if len(p.Teams) == 0 {
+				<div class="empty-state" style="padding: var(--space-2xl);">
+					<p style="font-size: var(--text-xl); color: var(--fg); margin-bottom: var(--space-sm);">
+						No teams yet
+					</p>
+					<p class="subtitle" style="margin-bottom: var(--space-md);">
+						Create your first team to get started.
+					</p>
+					<button class="button button-primary" data-on-click="$showModal = true" type="button">
+						+ Create Team
+					</button>
+				</div>
+			} else {
+				<div style="display: grid; gap: var(--space-md);">
+					for _, team := range p.Teams {
+						<a href={ templ.SafeURL("/t/" + team.Name) } class="panel" style="display: block; text-decoration: none; color: inherit;">
+							<h2 style="margin: 0 0 var(--space-xs); font-size: var(--text-xl);">{ team.Name }</h2>
+							<p class="subtitle" style="margin: 0;">View team →</p>
+						</a>
+					}
+				</div>
+			}
+			<div data-show="$showModal" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100;">
+				<div class="panel" style="max-width: 420px; width: 90%;" data-on-click__stop>
+					<div class="panel-header">
+						<h1>Create Team</h1>
+					</div>
+					<form method="post" action="/teams" class="form">
+						<input type="hidden" name="gorilla.csrf.Token" value={ p.CSRFToken }/>
+						<div class="form-field">
+							<label class="form-label" for="team-name">Team name</label>
+							<input
+								id="team-name"
+								class="form-input"
+								type="text"
+								name="name"
+								value={ p.PrefilledName }
+								required
+								autofocus
+								placeholder="my-team"
+								pattern="[a-zA-Z0-9_-]+"
+								title="Alphanumeric, hyphens, and underscores only"
+							/>
+						</div>
+						<div style="display: flex; gap: var(--space-sm); justify-content: flex-end;">
+							<button type="button" class="button button-ghost" data-on-click="$showModal = false">
+								Cancel
+							</button>
+							<button type="submit" class="button button-primary">
+								Create
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
 	}
 }

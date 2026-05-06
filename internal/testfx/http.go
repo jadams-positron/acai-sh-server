@@ -44,6 +44,27 @@ func (c *Client) WithHeader(key, value string) *Client {
 	return cc
 }
 
+// WithResponseCookies returns a copy of c with the cookies from resp appended
+// to the Cookie header. Use this to carry cookies (e.g. the CSRF cookie)
+// set on a previous GET response into a subsequent POST request.
+func (c *Client) WithResponseCookies(resp *Response) *Client {
+	cookies := resp.Cookies()
+	if len(cookies) == 0 {
+		return c
+	}
+	cc := c.clone()
+	existing := cc.headers["Cookie"]
+	for _, ck := range cookies {
+		if existing == "" {
+			existing = ck.Name + "=" + ck.Value
+		} else {
+			existing += "; " + ck.Name + "=" + ck.Value
+		}
+	}
+	cc.headers["Cookie"] = existing
+	return cc
+}
+
 func (c *Client) clone() *Client {
 	cp := &Client{t: c.t, echo: c.echo, headers: make(map[string]string, len(c.headers))}
 	maps.Copy(cp.headers, c.headers)

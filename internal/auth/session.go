@@ -72,6 +72,13 @@ func (s *SessionStore) CurrentUserID(c echo.Context) string {
 	return ""
 }
 
+// DeriveSessionEncKey derives the 32-byte AES encryption key from the
+// HMAC-SHA256 of authKey + a domain label. Exported so testfx can mint
+// valid session cookies without going through the magic-link flow.
+func DeriveSessionEncKey(authKey []byte) []byte {
+	return deriveEncKey(authKey)
+}
+
 func deriveEncKey(authKey []byte) []byte {
 	mac := hmac.New(sha256.New, authKey)
 	mac.Write([]byte("acai-session-enc-v1"))

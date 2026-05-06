@@ -6,16 +6,7 @@ import (
 
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/site/handlers"
-	"github.com/jadams-positron/acai-sh-server/internal/site/views"
 )
-
-// csrfTokenFromEcho returns the CSRF token echo's middleware injected.
-func csrfTokenFromEcho(c echo.Context) string {
-	if tok, ok := c.Get("csrf").(string); ok {
-		return tok
-	}
-	return ""
-}
 
 // MountAuthRoutes registers the login/logout routes on the group. Caller is
 // expected to have mounted auth.LoadScope at the parent group level.
@@ -38,15 +29,9 @@ func MountAuthRoutes(g *echo.Group, deps *handlers.AuthDeps, csrfMiddleware echo
 	logout.POST("/users/log-out", handlers.LogOut(deps))
 }
 
-// MountAuthRequiredStub mounts /teams as a P1d proof-of-life endpoint.
-func MountAuthRequiredStub(g *echo.Group, csrfMiddleware echo.MiddlewareFunc) {
+// MountTeamsRoutes registers /teams GET and POST on the group.
+func MountTeamsRoutes(g *echo.Group, deps *handlers.TeamsDeps, csrfMiddleware echo.MiddlewareFunc) {
 	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
-	authd.GET("/teams", func(c echo.Context) error {
-		s := auth.ScopeFromEcho(c)
-		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
-		return views.TeamsStub(views.TeamsStubProps{
-			UserEmail: s.User.Email,
-			CSRFToken: csrfTokenFromEcho(c),
-		}).Render(c.Request().Context(), c.Response())
-	})
+	authd.GET("/teams", handlers.TeamsIndex(deps))
+	authd.POST("/teams", handlers.TeamsCreate(deps))
 }
