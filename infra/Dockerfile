@@ -25,11 +25,20 @@ RUN templ generate \
       -o /out/acai \
       ./cmd/acai
 
+# Pre-create /data owned by the runtime nonroot user (uid 65532). When this
+# directory is copied to the runtime stage and a Docker named volume is mounted
+# over it, the volume inherits the directory's ownership — so SQLite (running
+# as nonroot) can write the DB file. Without this step, Docker creates /data
+# as root-owned and the server fails with SQLITE_CANTOPEN.
+RUN mkdir -p /out/data \
+ && chown -R 65532:65532 /out/data
+
 # --- runtime stage ---
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 USER nonroot:nonroot
 
 COPY --from=build /out/acai /acai
+COPY --from=build --chown=65532:65532 /out/data /data
 
 ENV DATABASE_PATH=/data/acai.db \
     HTTP_PORT=4000
