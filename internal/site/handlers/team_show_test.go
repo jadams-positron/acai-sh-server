@@ -43,6 +43,77 @@ func TestTeamShow_RendersForMember(t *testing.T) {
 	}
 }
 
+func TestTeamShow_RendersHeatmapAndBanner(t *testing.T) {
+	app := testfx.NewApp(t, testfx.NewAppOpts{})
+	user := testfx.SeedUser(t, app.DB, testfx.SeedUserOpts{Email: "heatmap@test.example"})
+	team := testfx.SeedTeam(t, app.DB, testfx.SeedTeamOpts{Name: "heatteam"})
+	testfx.SeedUserTeamRole(t, app.DB, user, team, "owner")
+
+	prodLedger := testfx.SeedProduct(t, app.DB, team, testfx.SeedProductOpts{Name: "ledger"})
+	prodBilling := testfx.SeedProduct(t, app.DB, team, testfx.SeedProductOpts{Name: "billing"})
+
+	implLedger := testfx.SeedImplementation(t, app.DB, prodLedger, testfx.SeedImplementationOpts{Name: "production"})
+	implBilling := testfx.SeedImplementation(t, app.DB, prodBilling, testfx.SeedImplementationOpts{Name: "production"})
+
+	branchL := testfx.SeedBranch(t, app.DB, team, testfx.SeedBranchOpts{
+		RepoURI: "github.com/acme/ledger", BranchName: "main",
+	})
+	branchB := testfx.SeedBranch(t, app.DB, team, testfx.SeedBranchOpts{
+		RepoURI: "github.com/acme/billing", BranchName: "main",
+	})
+	testfx.SeedTrackedBranch(t, app.DB, implLedger, branchL)
+	testfx.SeedTrackedBranch(t, app.DB, implBilling, branchB)
+
+	// "auth" lives in both products; "ledger-only" lives only in ledger.
+	testfx.SeedSpec(t, app.DB, prodLedger, branchL, testfx.SeedSpecOpts{
+		FeatureName: "auth",
+		Requirements: map[string]any{
+			"ACID.1": map[string]any{"requirement": "first"},
+			"ACID.2": map[string]any{"requirement": "second"},
+		},
+	})
+	testfx.SeedSpec(t, app.DB, prodLedger, branchL, testfx.SeedSpecOpts{
+		FeatureName: "ledger-only",
+		Requirements: map[string]any{
+			"ACID.X": map[string]any{"requirement": "ledger only"},
+		},
+	})
+	testfx.SeedSpec(t, app.DB, prodBilling, branchB, testfx.SeedSpecOpts{
+		FeatureName: "auth",
+		Requirements: map[string]any{
+			"ACID.A": map[string]any{"requirement": "billing auth"},
+		},
+	})
+
+	client := testfx.LoggedInClient(t, app, user)
+	resp := client.GET("/t/heatteam", nil)
+	resp.AssertStatus(http.StatusOK)
+
+	body := string(resp.Body())
+	for _, want := range []string{
+		// Aggregate banner.
+		`>Progress<`,
+		`2 products`,
+		`2 implementations`,
+		`2 features`,
+		`>complete</div>`,
+		// Heatmap structure.
+		`<table class="heatmap"`,
+		`>Coverage<`,
+		`>auth<`,
+		`>ledger-only<`,
+		// Row totals on the right edge.
+		`heatmap-cell-total`,
+		// Cells: ledger×auth + ledger×ledger-only present, billing×auth present, billing×ledger-only EMPTY.
+		`heatmap-cell-empty`,   // billing has no "ledger-only" — cell rendered as empty
+		`heatmap-cell-present`, // at least one filled cell
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected %q in heatmap body; got: %.1000s", want, body)
+		}
+	}
+}
+
 func TestTeamShow_EmptyState_NudgesProductCreation(t *testing.T) {
 	app := testfx.NewApp(t, testfx.NewAppOpts{})
 	user := testfx.SeedUser(t, app.DB, testfx.SeedUserOpts{Email: "team-empty@test.example"})

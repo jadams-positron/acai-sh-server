@@ -336,6 +336,225 @@ a:hover {
     overflow: visible;
 }
 
+/* === Team heatmap (products × features) === */
+.heatmap-panel {
+    padding: var(--space-md) var(--space-md) var(--space-lg);
+}
+
+.heatmap-scroll {
+    overflow-x: auto;
+    padding-bottom: var(--space-sm);
+}
+
+.heatmap {
+    border-collapse: separate;
+    border-spacing: 4px;
+    margin: 0 auto;
+}
+
+/* Empty top-left corner cell. */
+.heatmap-corner {
+    width: 1%;
+    border: 0;
+    background: transparent;
+}
+
+/* Rotated feature column header — reads bottom-up at ~60° so long names
+   stay legible at typical product counts. */
+.heatmap-th-feature {
+    height: 140px;
+    width: 28px;
+    padding: 0 0 var(--space-sm);
+    vertical-align: bottom;
+    font-weight: 500;
+    font-size: var(--text-sm);
+    color: var(--muted);
+}
+
+.heatmap-th-feature a {
+    display: inline-block;
+    transform: rotate(-60deg);
+    transform-origin: 50% 100%;
+    white-space: nowrap;
+    text-decoration: none;
+    color: inherit;
+    padding-left: 8px;
+}
+
+.heatmap-th-feature a:hover {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.heatmap-th-feature span {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+}
+
+/* Product row label on the left. */
+.heatmap-th-product {
+    text-align: right;
+    padding: 0 var(--space-md) 0 0;
+    font-weight: 500;
+    font-size: var(--text-sm);
+    color: var(--fg);
+    white-space: nowrap;
+}
+
+.heatmap-th-product a {
+    color: inherit;
+    text-decoration: none;
+}
+
+.heatmap-th-product a:hover {
+    color: var(--accent);
+}
+
+.heatmap-th-rowtotal {
+    width: 80px;
+    text-align: center;
+    padding: 0 0 var(--space-sm);
+    vertical-align: bottom;
+    font-weight: 500;
+    font-size: var(--text-sm);
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+}
+
+/* The cells themselves. */
+.heatmap-cell {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid var(--border-subtle);
+    position: relative;
+}
+
+.heatmap-cell-empty {
+    border-style: dashed;
+    border-color: rgba(var(--color-muted-rgb), 0.18);
+    background: transparent;
+}
+
+.heatmap-cell-present {
+    --cell-fill: 0.08;
+    background: rgba(var(--color-accent-rgb), var(--cell-fill));
+    border-color: rgba(var(--color-accent-rgb), 0.35);
+    box-shadow: inset 0 0 8px rgba(var(--color-accent-rgb), calc(var(--cell-fill) * 0.4));
+}
+
+.heatmap-cell-present:hover {
+    border-color: var(--accent);
+    box-shadow:
+        inset 0 0 12px rgba(var(--color-accent-rgb), calc(var(--cell-fill) * 0.6)),
+        0 0 12px rgba(var(--color-accent-rgb), 0.4);
+}
+
+.heatmap-cell-blocked::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border: 1.5px solid var(--danger);
+    border-radius: 2px;
+    pointer-events: none;
+}
+
+.heatmap-cell a {
+    display: block;
+    width: 100%;
+    height: 100%;
+    text-decoration: none;
+}
+
+/* Per-row completion totals on the right edge. */
+.heatmap-cell-total {
+    padding: 0 var(--space-sm);
+    text-align: center;
+    color: var(--muted);
+}
+
+.heatmap-cell-total-pct {
+    color: var(--fg);
+    font-weight: 600;
+    font-size: var(--text-md);
+    font-family: var(--font-mono);
+}
+
+.heatmap-cell-total-meta {
+    font-size: var(--text-xs);
+    color: var(--muted);
+    margin-top: 2px;
+}
+
+/* Inline legend below the matrix. */
+.heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-subtle);
+    font-size: var(--text-xs);
+    color: var(--muted);
+    flex-wrap: wrap;
+}
+
+.heatmap-legend-label {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin: 0 var(--space-xs);
+}
+
+.heatmap-legend-swatch {
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid rgba(var(--color-accent-rgb), 0.35);
+}
+
+.heatmap-legend-swatch[data-fill="0"] {
+    background: rgba(var(--color-accent-rgb), 0.08);
+}
+
+.heatmap-legend-swatch[data-fill="25"] {
+    background: rgba(var(--color-accent-rgb), 0.22);
+}
+
+.heatmap-legend-swatch[data-fill="50"] {
+    background: rgba(var(--color-accent-rgb), 0.35);
+}
+
+.heatmap-legend-swatch[data-fill="75"] {
+    background: rgba(var(--color-accent-rgb), 0.5);
+}
+
+.heatmap-legend-swatch[data-fill="100"] {
+    background: rgba(var(--color-accent-rgb), 0.63);
+}
+
+.heatmap-legend-blocked {
+    background: rgba(var(--color-accent-rgb), 0.35);
+    border: 1px solid rgba(var(--color-accent-rgb), 0.35);
+    position: relative;
+}
+
+.heatmap-legend-blocked::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border: 1.5px solid var(--danger);
+    border-radius: 2px;
+}
+
+.heatmap-legend-empty {
+    background: transparent;
+    border: 1px dashed rgba(var(--color-muted-rgb), 0.18);
+}
+
 /* === Breadcrumbs === */
 .breadcrumbs {
     display: flex;
