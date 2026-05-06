@@ -160,7 +160,7 @@ func RegisterCreate(d *AuthDeps) echo.HandlerFunc {
 	}
 }
 
-func renderLoginWithFlash(c echo.Context, d *AuthDeps, flash string) error {
+func renderLoginWithFlash(c echo.Context, _ *AuthDeps, flash string) error {
 	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 	return views.LoginPage(views.LoginPageProps{
 		Flash:     flash,
@@ -168,7 +168,7 @@ func renderLoginWithFlash(c echo.Context, d *AuthDeps, flash string) error {
 	}).Render(c.Request().Context(), c.Response())
 }
 
-func renderRegisterWithFlash(c echo.Context, d *AuthDeps, flash string) error {
+func renderRegisterWithFlash(c echo.Context, _ *AuthDeps, flash string) error {
 	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 	return views.RegisterPage(views.RegisterPageProps{
 		Flash:     flash,

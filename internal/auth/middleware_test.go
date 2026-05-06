@@ -1,37 +1,20 @@
 package auth_test
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
-	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
-
-func newDB(t *testing.T) *store.DB {
-	t.Helper()
-	dir := t.TempDir()
-	db, err := store.Open(filepath.Join(dir, "test.db"))
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	t.Cleanup(func() { _ = db.Close() })
-	if err := store.RunMigrations(context.Background(), db); err != nil {
-		t.Fatalf("RunMigrations: %v", err)
-	}
-	return db
-}
 
 func newCtxWithScope(t *testing.T, scope *auth.Scope) (echo.Context, *httptest.ResponseRecorder) {
 	t.Helper()
 	e := echo.New()
-	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	req, _ := http.NewRequestWithContext(t.Context(), http.MethodGet, "/x", http.NoBody)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 	if scope != nil {

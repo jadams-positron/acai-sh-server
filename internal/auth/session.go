@@ -11,7 +11,9 @@ import (
 )
 
 const (
-	sessionName     = "_acai_session"
+	sessionName = "_acai_session"
+
+	// SessionLifetime is how long a session cookie persists.
 	SessionLifetime = 14 * 24 * time.Hour
 )
 

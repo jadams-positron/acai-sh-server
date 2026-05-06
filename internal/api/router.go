@@ -59,24 +59,32 @@ func Mount(parent *echo.Echo, deps *Deps) {
 }
 
 // unimplementedServer satisfies spec.ServerInterface with 501 stubs.
+// Method names follow oapi-codegen conventions (AcaiWebApi…) to match the
+// generated interface; revive var-naming warnings are suppressed because the
+// names are dictated by the code generator.
 type unimplementedServer struct{}
 
-func (unimplementedServer) AcaiWebApiFeatureContextControllerShow(c echo.Context, _ spec.AcaiWebApiFeatureContextControllerShowParams) error {
+//nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface
+func (unimplementedServer) AcaiWebApiFeatureContextControllerShow(_ echo.Context, _ spec.AcaiWebApiFeatureContextControllerShowParams) error {
 	return echo.NewHTTPError(http.StatusNotImplemented, "feature-context not implemented yet (P2b)")
 }
 
-func (unimplementedServer) AcaiWebApiFeatureStatesControllerUpdate(c echo.Context) error {
+//nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface
+func (unimplementedServer) AcaiWebApiFeatureStatesControllerUpdate(_ echo.Context) error {
 	return echo.NewHTTPError(http.StatusNotImplemented, "feature-states not implemented yet (P2c)")
 }
 
-func (unimplementedServer) AcaiWebApiImplementationFeaturesControllerIndex(c echo.Context, _ spec.AcaiWebApiImplementationFeaturesControllerIndexParams) error {
+//nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface
+func (unimplementedServer) AcaiWebApiImplementationFeaturesControllerIndex(_ echo.Context, _ spec.AcaiWebApiImplementationFeaturesControllerIndexParams) error {
 	return echo.NewHTTPError(http.StatusNotImplemented, "implementation-features not implemented yet (P2b)")
 }
 
-func (unimplementedServer) AcaiWebApiImplementationsControllerIndex(c echo.Context, _ spec.AcaiWebApiImplementationsControllerIndexParams) error {
+//nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface
+func (unimplementedServer) AcaiWebApiImplementationsControllerIndex(_ echo.Context, _ spec.AcaiWebApiImplementationsControllerIndexParams) error {
 	return echo.NewHTTPError(http.StatusNotImplemented, "implementations not implemented yet (P2b)")
 }
 
-func (unimplementedServer) AcaiWebApiPushControllerCreate(c echo.Context) error {
+//nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface
+func (unimplementedServer) AcaiWebApiPushControllerCreate(_ echo.Context) error {
 	return echo.NewHTTPError(http.StatusNotImplemented, "push not implemented yet (P2c)")
 }
