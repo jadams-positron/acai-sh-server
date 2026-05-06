@@ -11,6 +11,8 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/api/middleware"
 	"github.com/jadams-positron/acai-sh-server/internal/api/operations"
 	"github.com/jadams-positron/acai-sh-server/internal/api/spec"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 )
 
@@ -30,14 +32,16 @@ var openapiJSON = func() []byte {
 
 // Deps groups the dependencies the api sub-router needs.
 type Deps struct {
-	Teams      *teams.Repository
-	Operations *operations.Config
-	Limiter    middleware.Limiter
+	Teams           *teams.Repository
+	Products        *products.Repository
+	Implementations *implementations.Repository
+	Operations      *operations.Config
+	Limiter         middleware.Limiter
 }
 
 // Mount registers /api/v1/* routes on the parent echo. Public:
 // /api/v1/openapi.json. Authed: bearer + size-cap + rate-limit, then the
-// generated ServerInterface routes (501 stubs in P2a).
+// generated ServerInterface routes.
 func Mount(parent *echo.Echo, deps *Deps) {
 	v1 := parent.Group("/api/v1")
 
@@ -53,9 +57,20 @@ func Mount(parent *echo.Echo, deps *Deps) {
 		middleware.RateLimit(deps.Operations.RateLimitForPath, deps.Limiter),
 	)
 
-	// Register the generated ServerInterface using a stub server.
-	// In P2b/P2c, the real Server implementation replaces unimplementedServer.
-	spec.RegisterHandlers(authd, &unimplementedServer{})
+	srv := &Server{
+		products:        deps.Products,
+		implementations: deps.Implementations,
+	}
+	spec.RegisterHandlers(authd, srv)
+}
+
+// Server is the concrete spec.ServerInterface implementation. Methods that are
+// implemented live in their own file (e.g. server_implementations.go); the
+// rest are inherited from the embedded unimplementedServer.
+type Server struct {
+	unimplementedServer
+	products        *products.Repository
+	implementations *implementations.Repository
 }
 
 // unimplementedServer satisfies spec.ServerInterface with 501 stubs.
