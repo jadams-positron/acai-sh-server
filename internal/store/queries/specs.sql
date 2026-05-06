@@ -45,3 +45,21 @@ JOIN feature_branch_refs fbr ON fbr.branch_id = b.id AND fbr.feature_name = ?
 WHERE tb.implementation_id = ?
 ORDER BY fbr.pushed_at DESC
 LIMIT 1;
+
+-- name: ListSpecsForBranch :many
+SELECT *
+FROM specs
+WHERE branch_id = ?
+ORDER BY feature_name;
+
+-- name: ListFeatureImplStatesForImpl :many
+SELECT *
+FROM feature_impl_states
+WHERE implementation_id = ?
+ORDER BY feature_name;
+
+-- name: ListFeatureBranchRefsForBranch :many
+SELECT *
+FROM feature_branch_refs
+WHERE branch_id = ?
+ORDER BY feature_name;

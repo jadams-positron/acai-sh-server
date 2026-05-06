@@ -169,6 +169,126 @@ func (q *Queries) ListBranchesForImplementation(ctx context.Context, implementat
 	return items, nil
 }
 
+const listFeatureBranchRefsForBranch = `-- name: ListFeatureBranchRefsForBranch :many
+SELECT id, branch_id, feature_name, refs, "commit", pushed_at, inserted_at, updated_at
+FROM feature_branch_refs
+WHERE branch_id = ?
+ORDER BY feature_name
+`
+
+func (q *Queries) ListFeatureBranchRefsForBranch(ctx context.Context, branchID string) ([]FeatureBranchRef, error) {
+	rows, err := q.db.QueryContext(ctx, listFeatureBranchRefsForBranch, branchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FeatureBranchRef{}
+	for rows.Next() {
+		var i FeatureBranchRef
+		if err := rows.Scan(
+			&i.ID,
+			&i.BranchID,
+			&i.FeatureName,
+			&i.Refs,
+			&i.Commit,
+			&i.PushedAt,
+			&i.InsertedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listFeatureImplStatesForImpl = `-- name: ListFeatureImplStatesForImpl :many
+SELECT id, implementation_id, feature_name, states, inserted_at, updated_at
+FROM feature_impl_states
+WHERE implementation_id = ?
+ORDER BY feature_name
+`
+
+func (q *Queries) ListFeatureImplStatesForImpl(ctx context.Context, implementationID string) ([]FeatureImplState, error) {
+	rows, err := q.db.QueryContext(ctx, listFeatureImplStatesForImpl, implementationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FeatureImplState{}
+	for rows.Next() {
+		var i FeatureImplState
+		if err := rows.Scan(
+			&i.ID,
+			&i.ImplementationID,
+			&i.FeatureName,
+			&i.States,
+			&i.InsertedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSpecsForBranch = `-- name: ListSpecsForBranch :many
+SELECT id, product_id, branch_id, path, last_seen_commit, parsed_at, feature_name, feature_description, feature_version, raw_content, requirements, inserted_at, updated_at
+FROM specs
+WHERE branch_id = ?
+ORDER BY feature_name
+`
+
+func (q *Queries) ListSpecsForBranch(ctx context.Context, branchID string) ([]Spec, error) {
+	rows, err := q.db.QueryContext(ctx, listSpecsForBranch, branchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Spec{}
+	for rows.Next() {
+		var i Spec
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.BranchID,
+			&i.Path,
+			&i.LastSeenCommit,
+			&i.ParsedAt,
+			&i.FeatureName,
+			&i.FeatureDescription,
+			&i.FeatureVersion,
+			&i.RawContent,
+			&i.Requirements,
+			&i.InsertedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const pickRefsBranchForFeature = `-- name: PickRefsBranchForFeature :one
 SELECT b.id, b.team_id, b.repo_uri, b.branch_name, b.last_seen_commit, b.inserted_at, b.updated_at
 FROM branches b

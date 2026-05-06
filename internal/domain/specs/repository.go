@@ -104,6 +104,60 @@ func (r *Repository) FirstTrackedBranch(ctx context.Context, implID string) (*Br
 	return branchFromRow(rows[0]), nil
 }
 
+// ListSpecsForBranch returns all specs on the given branch ordered by feature_name.
+func (r *Repository) ListSpecsForBranch(ctx context.Context, branchID string) ([]*Spec, error) {
+	q := sqlc.New(r.db.Read)
+	rows, err := q.ListSpecsForBranch(ctx, branchID)
+	if err != nil {
+		return nil, fmt.Errorf("specs: ListSpecsForBranch: %w", err)
+	}
+	out := make([]*Spec, 0, len(rows))
+	for i := range rows {
+		s, err := specFromRow(rows[i])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, nil
+}
+
+// ListStatesForImpl returns all feature_impl_states rows for the impl.
+func (r *Repository) ListStatesForImpl(ctx context.Context, implID string) ([]*FeatureImplState, error) {
+	q := sqlc.New(r.db.Read)
+	rows, err := q.ListFeatureImplStatesForImpl(ctx, implID)
+	if err != nil {
+		return nil, fmt.Errorf("specs: ListStatesForImpl: %w", err)
+	}
+	out := make([]*FeatureImplState, 0, len(rows))
+	for i := range rows {
+		s, err := statesFromRow(rows[i])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, s)
+	}
+	return out, nil
+}
+
+// ListRefsForBranch returns all feature_branch_refs rows for the branch.
+func (r *Repository) ListRefsForBranch(ctx context.Context, branchID string) ([]*FeatureBranchRef, error) {
+	q := sqlc.New(r.db.Read)
+	rows, err := q.ListFeatureBranchRefsForBranch(ctx, branchID)
+	if err != nil {
+		return nil, fmt.Errorf("specs: ListRefsForBranch: %w", err)
+	}
+	out := make([]*FeatureBranchRef, 0, len(rows))
+	for i := range rows {
+		rf, err := refsFromRow(rows[i])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, rf)
+	}
+	return out, nil
+}
+
 func branchFromRow(row sqlc.Branch) *Branch {
 	updatedAt, _ := time.Parse(time.RFC3339Nano, row.UpdatedAt)
 	return &Branch{
