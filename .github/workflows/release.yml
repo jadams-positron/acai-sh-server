@@ -25,7 +25,7 @@ jobs:
               with:
                   fetch-depth: 0
 
-            - name: Ensure tag commit is on main and version matches mix.exs
+            - name: Ensure tag commit is on main; derive version from tag
               id: validate
               run: |
                   set -euo pipefail
@@ -40,18 +40,8 @@ jobs:
                     exit 1
                   fi
 
-                  VERSION="$(grep -E '^[[:space:]]*version:' mix.exs | head -1 | sed -E 's/.*"([^"]+)".*/\1/')"
-                  if [ -z "$VERSION" ]; then
-                    echo "Could not determine version from mix.exs"
-                    exit 1
-                  fi
-
-                  TAG_VERSION_STRIPPED="${TAG_NAME#v}"
-
-                  if [ "$TAG_VERSION_STRIPPED" != "$VERSION" ]; then
-                    echo "Tag version ($TAG_VERSION_STRIPPED) does not match mix.exs version ($VERSION)."
-                    exit 1
-                  fi
+                  # Tag is the source of truth for version. Strip a leading 'v' if present.
+                  VERSION="${TAG_NAME#v}"
 
                   echo "VERSION=$VERSION" >> "$GITHUB_ENV"
                   echo "TAG_NAME=$TAG_NAME" >> "$GITHUB_ENV"
@@ -78,7 +68,7 @@ jobs:
             - name: Build app image with docker compose
               run: |
                   set -euo pipefail
-                  docker compose -f infra/docker-compose.yml build app
+                  docker compose -f infra/docker-compose.yml build acai
 
             - name: Tag image with version and latest
               run: |
