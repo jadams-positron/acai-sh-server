@@ -1,0 +1,123 @@
+package views
+
+import "github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+
+// ShellProps drives the authenticated app shell — topbar (brand + team
+// switcher + user chip/logout) plus a left sidebar with team-scoped nav.
+//
+// ActiveTeam is nil for routes that aren't team-scoped (e.g. /teams).
+// ActiveSection identifies the current sidebar entry: one of "overview",
+// "settings", "tokens", or "" when no entry should be highlighted.
+type ShellProps struct {
+	Title           string
+	UserEmail       string
+	Teams           []*teams.Team
+	ActiveTeam      *teams.Team
+	ActiveSection   string
+	LogoutCSRFToken string
+	Crumbs          []Crumb
+}
+
+// Crumb is one segment of a breadcrumb trail. HRef may be empty for the
+// terminal segment (rendered as plain text).
+type Crumb struct {
+	Label string
+	HRef  string
+}
+
+templ Shell(p ShellProps) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>{ p.Title } — Acai</title>
+			<link rel="stylesheet" href="/_assets/css/app.css"/>
+			<script type="module" src="/_assets/js/datastar.min.js"></script>
+		</head>
+		<body>
+			<div class="app">
+				<header class="topbar">
+					<div class="brand">
+						<span class="brand-dot"></span>
+						<a class="brand-name" href="/teams" style="color: var(--fg); text-decoration: none;">acai</a>
+					</div>
+					<div class="topbar-meta">
+						@teamSwitcher(p.Teams, p.ActiveTeam)
+						@userChip(p.UserEmail, p.LogoutCSRFToken)
+					</div>
+				</header>
+				<div class="app-body">
+					<aside class="sidebar">
+						@sidebarNav(p.ActiveTeam, p.ActiveSection)
+					</aside>
+					<main class="main">
+						if len(p.Crumbs) > 0 {
+							@Breadcrumbs(p.Crumbs)
+						}
+						{ children... }
+					</main>
+				</div>
+			</div>
+		</body>
+	</html>
+}
+
+// teamSwitcher renders a native <select> that navigates on change. Empty
+// teams list collapses to a single "Create team…" affordance.
+templ teamSwitcher(ts []*teams.Team, active *teams.Team) {
+	if len(ts) == 0 {
+		<a class="nav-item" href="/teams" style="border-color: var(--border); color: var(--fg);">+ Create team</a>
+	} else {
+		<select
+			class="team-switcher"
+			data-on-change="window.location.href = evt.target.value"
+		>
+			for _, t := range ts {
+				if active != nil && t.ID == active.ID {
+					<option value={ "/t/" + t.Name } selected>{ t.Name }</option>
+				} else {
+					<option value={ "/t/" + t.Name }>{ t.Name }</option>
+				}
+			}
+			<option value="/teams">— All teams —</option>
+		</select>
+	}
+}
+
+// userChip renders the right-side identity block: email + logout form.
+templ userChip(email, csrfToken string) {
+	<div class="user-chip">
+		<span class="user-chip-email">{ email }</span>
+		<form method="post" action="/users/log-out">
+			<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+			<button type="submit" class="user-chip-logout" title="Log out">log out</button>
+		</form>
+	</div>
+}
+
+// sidebarNav renders the left-rail navigation for the current scope.
+// When activeTeam is nil (e.g. /teams), only "Your teams" is shown.
+templ sidebarNav(activeTeam *teams.Team, activeSection string) {
+	<nav class="nav">
+		if activeTeam == nil {
+			<a class="nav-item is-active" href="/teams">Your teams</a>
+		} else {
+			<div class="sidebar-section-label">{ activeTeam.Name }</div>
+			@navItem("/t/"+activeTeam.Name, "Overview", activeSection == "overview")
+			@navItem("/t/"+activeTeam.Name+"/settings", "Settings", activeSection == "settings")
+			@navItem("/t/"+activeTeam.Name+"/tokens", "Tokens", activeSection == "tokens")
+			<div style="height: 1px; background: var(--border-subtle); margin: var(--space-sm) 0;"></div>
+			<div class="sidebar-section-label">All</div>
+			<a class="nav-item" href="/teams">Your teams</a>
+		}
+	</nav>
+}
+
+templ navItem(href, label string, active bool) {
+	if active {
+		<a class="nav-item is-active" href={ templ.SafeURL(href) }>{ label }</a>
+	} else {
+		<a class="nav-item" href={ templ.SafeURL(href) }>{ label }</a>
+	}
+}

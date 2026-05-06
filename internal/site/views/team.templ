@@ -7,6 +7,7 @@ import (
 
 // TeamShowProps drives the /t/{team_name} page.
 type TeamShowProps struct {
+	Shell                ShellProps
 	Team                 *teams.Team
 	Products             []*products.Product
 	Members              []*teams.Member
@@ -16,12 +17,9 @@ type TeamShowProps struct {
 }
 
 templ TeamShow(p TeamShowProps) {
-	@Layout(p.Team.Name) {
+	@Shell(p.Shell) {
 		<header class="page-header">
 			<h1 class="title">{ p.Team.Name }</h1>
-			<p class="subtitle">
-				<a href="/teams">← All teams</a>
-			</p>
 		</header>
 		if p.Flash != "" {
 			<div class="banner banner-error">{ p.Flash }</div>
@@ -101,8 +99,8 @@ templ TeamShow(p TeamShowProps) {
 								required
 								autofocus
 								placeholder="my-product"
-								pattern="[a-zA-Z0-9_-]+"
-								title="Alphanumeric, hyphens, and underscores only"
+								pattern="[a-zA-Z0-9_.-]+"
+								title="Alphanumeric, hyphens, underscores, and periods only"
 							/>
 						</div>
 						<div style="display: flex; gap: var(--space-sm); justify-content: flex-end;">

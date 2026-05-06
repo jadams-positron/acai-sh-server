@@ -30,8 +30,16 @@ func TeamsIndex(d *TeamsDeps) echo.HandlerFunc {
 			d.Logger.Error("teams: ListForUser", "error", err)
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load teams")
 		}
+		shell, err := buildShellChrome(c, d.Teams, "Teams", nil, "", []views.Crumb{
+			{Label: "Your teams"},
+		})
+		if err != nil {
+			d.Logger.Error("teams: shell chrome", "error", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load teams")
+		}
 		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 		return views.TeamsIndex(views.TeamsIndexProps{
+			Shell:     shell,
 			Teams:     list,
 			CSRFToken: csrfTokenFromEcho(c),
 		}).Render(c.Request().Context(), c.Response())
@@ -63,9 +71,17 @@ func TeamsCreate(d *TeamsDeps) echo.HandlerFunc {
 			default:
 				d.Logger.Error("teams: create", "error", err)
 			}
+			shell, sherr := buildShellChrome(c, d.Teams, "Teams", nil, "", []views.Crumb{
+				{Label: "Your teams"},
+			})
+			if sherr != nil {
+				d.Logger.Error("teams: shell chrome (after create-error)", "error", sherr)
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to load teams")
+			}
 			c.Response().WriteHeader(http.StatusUnprocessableEntity)
 			c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 			return views.TeamsIndex(views.TeamsIndexProps{
+				Shell:         shell,
 				Teams:         list,
 				CSRFToken:     csrfTokenFromEcho(c),
 				Flash:         flash,

@@ -30,6 +30,7 @@
 
     /* === Surfaces === */
     --topbar: rgb(10, 15, 22);
+    --sidebar: rgb(10, 16, 24);
     --surface-inset: rgba(10, 18, 28, 0.7);
 
     /* === Spacing === */
@@ -137,7 +138,62 @@ a:hover {
     color: var(--fg);
 }
 
-/* === Main content area === */
+.topbar-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    font-size: var(--text-sm);
+}
+
+.team-switcher {
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--fg);
+    font-family: inherit;
+    font-size: var(--text-sm);
+    padding: 6px var(--space-md);
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.team-switcher:hover {
+    border-color: var(--border);
+}
+
+.user-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    color: var(--muted);
+}
+
+.user-chip-email {
+    color: var(--fg);
+}
+
+.user-chip form {
+    display: inline;
+    margin: 0;
+}
+
+.user-chip-logout {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: var(--muted);
+    font: inherit;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: var(--text-xs);
+    cursor: pointer;
+}
+
+.user-chip-logout:hover {
+    color: var(--accent);
+}
+
+/* === Main content area (auth/centered fallback) === */
 .main {
     flex-grow: 1;
     padding: var(--space-2xl) var(--space-lg);
@@ -151,6 +207,99 @@ a:hover {
 .main-narrow {
     max-width: 440px;
     width: 100%;
+}
+
+/* === Authed shell (sidebar + main column) === */
+.app-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+}
+
+.sidebar {
+    width: 220px;
+    background: var(--sidebar);
+    border-right: 1px solid var(--border-subtle);
+    padding: 28px var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+    flex-shrink: 0;
+}
+
+.sidebar-section-label {
+    color: var(--muted);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    padding: 0 var(--space-md);
+}
+
+.nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.nav-item {
+    text-decoration: none;
+    color: var(--muted);
+    padding: 10px var(--space-md);
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    transition: 0.2s ease;
+    font-size: var(--text-md);
+}
+
+.nav-item:hover {
+    color: var(--fg);
+    border-color: var(--border-hover);
+    box-shadow: inset 0 0 14px var(--glow-inner);
+    text-decoration: none;
+}
+
+.nav-item.is-active {
+    color: var(--fg);
+    border-color: var(--border);
+    background: rgb(14, 24, 34);
+    box-shadow: 0 0 18px var(--glow-soft);
+    position: relative;
+    z-index: 2;
+}
+
+.app-body .main {
+    flex-grow: 1;
+    min-width: 0;
+    padding: var(--space-xl) var(--space-2xl) 64px;
+    display: block;
+    overflow-y: auto;
+}
+
+/* === Breadcrumbs === */
+.breadcrumbs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-sm);
+    color: var(--muted);
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-lg);
+}
+
+.breadcrumbs a {
+    color: var(--muted);
+}
+
+.breadcrumbs a:hover {
+    color: var(--accent);
+}
+
+.breadcrumbs-sep {
+    color: var(--border);
+}
+
+.breadcrumbs-current {
+    color: var(--fg);
 }
 
 /* === Page headers === */
@@ -364,4 +513,34 @@ code {
     .topbar { padding: var(--space-md) 20px; }
     .main { padding: var(--space-lg) var(--space-md); }
     .title { font-size: 32px; }
+
+    .app-body {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        flex-direction: row;
+        align-items: center;
+        gap: var(--space-md);
+        padding: var(--space-md) var(--space-lg);
+        overflow-x: auto;
+    }
+
+    .sidebar-section-label {
+        display: none;
+    }
+
+    .nav {
+        flex-direction: row;
+        flex-wrap: nowrap;
+    }
+
+    .nav-item {
+        white-space: nowrap;
+    }
+
+    .app-body .main {
+        padding: var(--space-lg) var(--space-md);
+    }
 }

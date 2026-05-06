@@ -8,6 +8,7 @@ import (
 
 // TeamTokensProps drives the /t/{team_name}/tokens page.
 type TeamTokensProps struct {
+	Shell             ShellProps
 	Team              *teams.Team
 	Tokens            []*teams.AccessToken
 	CSRFToken         string
@@ -17,12 +18,9 @@ type TeamTokensProps struct {
 }
 
 templ TeamTokens(p TeamTokensProps) {
-	@Layout(p.Team.Name + " · Tokens") {
+	@Shell(p.Shell) {
 		<header class="page-header">
-			<h1 class="title">{ p.Team.Name } · API Tokens</h1>
-			<p class="subtitle">
-				<a href={ templ.SafeURL("/t/" + p.Team.Name) }>← { p.Team.Name }</a>
-			</p>
+			<h1 class="title">API Tokens</h1>
 		</header>
 		if p.NewlyCreatedToken != "" {
 			<div class="banner banner-success" style="font-family: var(--font-mono, monospace); word-break: break-all;">

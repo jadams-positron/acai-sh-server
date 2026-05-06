@@ -1,0 +1,19 @@
+package views
+
+// Breadcrumbs renders a horizontal trail of links. The last crumb's HRef
+// is ignored — that segment is always rendered as plain text (the user
+// is already there).
+templ Breadcrumbs(crumbs []Crumb) {
+	<nav class="breadcrumbs" aria-label="Breadcrumb">
+		for i, c := range crumbs {
+			if i > 0 {
+				<span class="breadcrumbs-sep">/</span>
+			}
+			if i == len(crumbs)-1 || c.HRef == "" {
+				<span class="breadcrumbs-current">{ c.Label }</span>
+			} else {
+				<a href={ templ.SafeURL(c.HRef) }>{ c.Label }</a>
+			}
+		}
+	</nav>
+}

@@ -59,8 +59,17 @@ func TeamShow(d *TeamShowDeps) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load members")
 		}
 
+		shell, err := buildShellChrome(c, d.Teams, team.Name, team, "overview", []views.Crumb{
+			{Label: "Teams", HRef: "/teams"},
+			{Label: team.Name},
+		})
+		if err != nil {
+			d.Logger.Error("team show: shell chrome", "error", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load team")
+		}
 		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 		return views.TeamShow(views.TeamShowProps{
+			Shell:     shell,
 			Team:      team,
 			Products:  prods,
 			Members:   members,
@@ -104,9 +113,18 @@ func TeamCreateProduct(d *TeamShowDeps) echo.HandlerFunc {
 			default:
 				d.Logger.Error("team show: create product", "error", err)
 			}
+			shell, sherr := buildShellChrome(c, d.Teams, team.Name, team, "overview", []views.Crumb{
+				{Label: "Teams", HRef: "/teams"},
+				{Label: team.Name},
+			})
+			if sherr != nil {
+				d.Logger.Error("team show: shell chrome (after create-error)", "error", sherr)
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to load team")
+			}
 			c.Response().WriteHeader(http.StatusUnprocessableEntity)
 			c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 			return views.TeamShow(views.TeamShowProps{
+				Shell:                shell,
 				Team:                 team,
 				Products:             prods,
 				Members:              members,

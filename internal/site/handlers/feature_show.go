@@ -50,8 +50,18 @@ func FeatureShow(d *FeatureShowDeps) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load feature")
 		}
 
+		shell, err := buildShellChrome(c, d.Teams, featureName+" · "+team.Name, team, "overview", []views.Crumb{
+			{Label: "Teams", HRef: "/teams"},
+			{Label: team.Name, HRef: "/t/" + team.Name},
+			{Label: featureName},
+		})
+		if err != nil {
+			d.Logger.Error("feature show: shell chrome", "error", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load feature")
+		}
 		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 		return views.FeatureShow(views.FeatureShowProps{
+			Shell:              shell,
 			Team:               team,
 			FeatureName:        featureName,
 			FeatureDescription: view.FeatureDescription,
