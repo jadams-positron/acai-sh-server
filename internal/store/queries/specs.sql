@@ -125,3 +125,9 @@ SET refs = excluded.refs,
 INSERT INTO tracked_branches (implementation_id, branch_id, repo_uri, inserted_at, updated_at)
 VALUES (?, ?, ?, ?, ?)
 ON CONFLICT(implementation_id, branch_id) DO NOTHING;
+
+-- name: ListDistinctFeatureNamesForProduct :many
+SELECT DISTINCT feature_name
+FROM specs
+WHERE product_id = ?
+ORDER BY feature_name;

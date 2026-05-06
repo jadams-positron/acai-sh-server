@@ -1,0 +1,88 @@
+package views
+
+import (
+	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+)
+
+// ProductShowProps drives the /t/{team_name}/p/{product_name} page.
+type ProductShowProps struct {
+	Team            *teams.Team
+	Product         *products.Product
+	Implementations []*implementations.Implementation
+	FeatureNames    []string
+}
+
+templ ProductShow(p ProductShowProps) {
+	@Layout(p.Product.Name + " · " + p.Team.Name) {
+		<header class="page-header">
+			<p class="subtitle">
+				<a href="/teams">Teams</a>
+				{ " / " }
+				<a href={ templ.SafeURL("/t/" + p.Team.Name) }>{ p.Team.Name }</a>
+				{ " / " }
+				<span>{ p.Product.Name }</span>
+			</p>
+			<h1 class="title">{ p.Product.Name }</h1>
+			if p.Product.Description != nil && *p.Product.Description != "" {
+				<p class="subtitle">{ *p.Product.Description }</p>
+			}
+		</header>
+
+		<div style="display: grid; gap: var(--space-xl);">
+			// Implementations section
+			<section>
+				<h2 style="font-size: var(--text-2xl); margin: 0 0 var(--space-md);">Implementations</h2>
+				if len(p.Implementations) == 0 {
+					<div class="empty-state">
+						<p>No implementations yet. Create one via <code>acai push --target=&lt;name&gt; --parent=&lt;parent&gt;</code> on a tracked branch.</p>
+					</div>
+				} else {
+					<div style="display: grid; gap: var(--space-md); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));">
+						for _, impl := range p.Implementations {
+							<div class="panel">
+								<h3 style="margin: 0 0 var(--space-xs); font-size: var(--text-lg);">{ impl.Name }</h3>
+								if impl.Description != nil && *impl.Description != "" {
+									<p class="subtitle" style="margin: 0;">{ *impl.Description }</p>
+								} else if impl.ParentImplementationID != nil {
+									<p class="subtitle" style="margin: 0;">child impl</p>
+								} else {
+									<p class="subtitle" style="margin: 0;">root impl</p>
+								}
+							</div>
+						}
+					</div>
+				}
+			</section>
+
+			// Features section
+			<section>
+				<h2 style="font-size: var(--text-2xl); margin: 0 0 var(--space-md);">Features</h2>
+				if len(p.FeatureNames) == 0 {
+					<div class="empty-state">
+						<p>No features yet. Push a spec via <code>acai push</code>.</p>
+					</div>
+				} else {
+					<div class="panel" style="padding: 0;">
+						<ul style="list-style: none; margin: 0; padding: 0;">
+							for i, name := range p.FeatureNames {
+								if i > 0 {
+									<li style="border-top: 1px solid var(--border-subtle);"></li>
+								}
+								<li>
+									<a
+										href={ templ.SafeURL("/t/" + p.Team.Name + "/f/" + name) }
+										style="display: block; padding: var(--space-md); color: var(--fg); text-decoration: none;"
+									>
+										{ name }
+									</a>
+								</li>
+							}
+						</ul>
+					</div>
+				}
+			</section>
+		</div>
+	}
+}

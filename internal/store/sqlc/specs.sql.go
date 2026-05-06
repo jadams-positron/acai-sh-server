@@ -236,6 +236,36 @@ func (q *Queries) ListBranchesForImplementation(ctx context.Context, implementat
 	return items, nil
 }
 
+const listDistinctFeatureNamesForProduct = `-- name: ListDistinctFeatureNamesForProduct :many
+SELECT DISTINCT feature_name
+FROM specs
+WHERE product_id = ?
+ORDER BY feature_name
+`
+
+func (q *Queries) ListDistinctFeatureNamesForProduct(ctx context.Context, productID string) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, listDistinctFeatureNamesForProduct, productID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var feature_name string
+		if err := rows.Scan(&feature_name); err != nil {
+			return nil, err
+		}
+		items = append(items, feature_name)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listFeatureBranchRefsForBranch = `-- name: ListFeatureBranchRefsForBranch :many
 SELECT id, branch_id, feature_name, refs, "commit", pushed_at, inserted_at, updated_at
 FROM feature_branch_refs

@@ -404,6 +404,17 @@ func (r *Repository) UpsertFeatureBranchRef(ctx context.Context, branchID, featu
 	})
 }
 
+// ListDistinctFeatureNamesForProduct returns the distinct feature_name values
+// across all specs under productID, sorted ascending.
+func (r *Repository) ListDistinctFeatureNamesForProduct(ctx context.Context, productID string) ([]string, error) {
+	q := sqlc.New(r.db.Read)
+	rows, err := q.ListDistinctFeatureNamesForProduct(ctx, productID)
+	if err != nil {
+		return nil, fmt.Errorf("specs: ListDistinctFeatureNamesForProduct: %w", err)
+	}
+	return rows, nil
+}
+
 // UpsertTrackedBranch inserts a tracked_branches row for (implID, branchID) if not
 // already present. Silently no-ops if the row exists.
 func (r *Repository) UpsertTrackedBranch(ctx context.Context, implID, branchID, repoURI string) error {
