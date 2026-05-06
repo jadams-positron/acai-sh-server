@@ -30,3 +30,14 @@ func (t *AccessToken) IsValid(now time.Time) bool {
 	}
 	return true
 }
+
+// Status returns a human-readable token state: "active", "revoked", or "expired".
+func (t *AccessToken) Status(now time.Time) string {
+	if t.RevokedAt != nil {
+		return "revoked"
+	}
+	if t.ExpiresAt != nil && !t.ExpiresAt.After(now) {
+		return "expired"
+	}
+	return "active"
+}

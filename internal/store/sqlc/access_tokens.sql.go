@@ -93,6 +93,49 @@ func (q *Queries) GetAccessTokenByPrefix(ctx context.Context, tokenPrefix string
 	return i, err
 }
 
+const listAccessTokensForTeam = `-- name: ListAccessTokensForTeam :many
+SELECT id, user_id, team_id, name, token_hash, token_prefix, scopes, expires_at, revoked_at, last_used_at, inserted_at, updated_at
+FROM access_tokens
+WHERE team_id = ?
+ORDER BY inserted_at DESC
+`
+
+func (q *Queries) ListAccessTokensForTeam(ctx context.Context, teamID string) ([]AccessToken, error) {
+	rows, err := q.db.QueryContext(ctx, listAccessTokensForTeam, teamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []AccessToken{}
+	for rows.Next() {
+		var i AccessToken
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.TeamID,
+			&i.Name,
+			&i.TokenHash,
+			&i.TokenPrefix,
+			&i.Scopes,
+			&i.ExpiresAt,
+			&i.RevokedAt,
+			&i.LastUsedAt,
+			&i.InsertedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const revokeAccessToken = `-- name: RevokeAccessToken :exec
 UPDATE access_tokens
 SET revoked_at = ?, updated_at = ?

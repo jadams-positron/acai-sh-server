@@ -39,3 +39,17 @@ SELECT *
 FROM user_team_roles
 WHERE team_id = ? AND user_id = ?
 LIMIT 1;
+
+-- name: DeleteUserTeamRole :exec
+DELETE FROM user_team_roles
+WHERE team_id = ? AND user_id = ?;
+
+-- name: UpdateUserTeamRole :exec
+UPDATE user_team_roles
+SET title = ?, updated_at = ?
+WHERE team_id = ? AND user_id = ?;
+
+-- name: CountOwnersForTeam :one
+SELECT COUNT(*) AS count
+FROM user_team_roles
+WHERE team_id = ? AND title = 'owner';

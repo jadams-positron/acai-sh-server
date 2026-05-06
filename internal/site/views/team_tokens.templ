@@ -1,0 +1,158 @@
+package views
+
+import (
+	"time"
+
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+)
+
+// TeamTokensProps drives the /t/{team_name}/tokens page.
+type TeamTokensProps struct {
+	Team              *teams.Team
+	Tokens            []*teams.AccessToken
+	CSRFToken         string
+	Flash             string
+	FlashType         string // "error" or "success"
+	NewlyCreatedToken string // shown ONCE after token creation
+}
+
+templ TeamTokens(p TeamTokensProps) {
+	@Layout(p.Team.Name + " · Tokens") {
+		<header class="page-header">
+			<h1 class="title">{ p.Team.Name } · API Tokens</h1>
+			<p class="subtitle">
+				<a href={ templ.SafeURL("/t/" + p.Team.Name) }>← { p.Team.Name }</a>
+			</p>
+		</header>
+		if p.NewlyCreatedToken != "" {
+			<div class="banner banner-success" style="font-family: var(--font-mono, monospace); word-break: break-all;">
+				<strong>Save this token — you will not see it again:</strong>
+				<br/>
+				{ p.NewlyCreatedToken }
+			</div>
+		}
+		if p.Flash != "" {
+			if p.FlashType == "success" {
+				<div class="banner banner-success">{ p.Flash }</div>
+			} else {
+				<div class="banner banner-error">{ p.Flash }</div>
+			}
+		}
+		<div data-signals="{showCreateModal: false}" style="display: grid; gap: var(--space-xl);">
+			<section>
+				<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
+					<h2 style="font-size: var(--text-2xl); margin: 0;">API Tokens</h2>
+					<button class="button button-primary" data-on-click="$showCreateModal = true" type="button">
+						+ Create Token
+					</button>
+				</div>
+				if len(p.Tokens) == 0 {
+					<div class="empty-state">
+						<p>No tokens yet. Create one to get started.</p>
+					</div>
+				} else {
+					<div class="panel" style="padding: 0;">
+						<table style="width: 100%; border-collapse: collapse;">
+							<thead>
+								<tr style="border-bottom: 1px solid var(--border-subtle);">
+									<th style="text-align: left; padding: var(--space-md);">Name</th>
+									<th style="text-align: left; padding: var(--space-md);">Prefix</th>
+									<th style="text-align: left; padding: var(--space-md);">Created</th>
+									<th style="text-align: left; padding: var(--space-md);">Last Used</th>
+									<th style="text-align: left; padding: var(--space-md);">Status</th>
+									<th style="text-align: right; padding: var(--space-md);"></th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, tok := range p.Tokens {
+									<tr style="border-bottom: 1px solid var(--border-subtle);">
+										<td style="padding: var(--space-md);">{ tok.Name }</td>
+										<td style="padding: var(--space-md); font-family: var(--font-mono, monospace);">{ tok.TokenPrefix }</td>
+										<td style="padding: var(--space-md); color: var(--text-muted);">{ tok.InsertedAt.Format(time.DateOnly) }</td>
+										<td style="padding: var(--space-md); color: var(--text-muted);">
+											if tok.LastUsedAt != nil {
+												{ tok.LastUsedAt.Format(time.DateOnly) }
+											} else {
+												never
+											}
+										</td>
+										<td style="padding: var(--space-md);">
+											<span class={ tokenStatusClass(tok.Status(time.Now())) }>
+												{ tok.Status(time.Now()) }
+											</span>
+										</td>
+										<td style="text-align: right; padding: var(--space-md);">
+											if tok.RevokedAt == nil {
+												<form method="post" action={ templ.SafeURL("/t/" + p.Team.Name + "/tokens/" + tok.TokenPrefix + "/revoke") } style="display: inline;">
+													<input type="hidden" name="gorilla.csrf.Token" value={ p.CSRFToken }/>
+													<button type="submit" class="button button-ghost" style="color: var(--color-danger); font-size: var(--text-sm);">
+														Revoke
+													</button>
+												</form>
+											}
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+			</section>
+			<div
+				data-show="$showCreateModal"
+				style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100;"
+			>
+				<div class="panel" style="max-width: 420px; width: 90%;" data-on-click__stop>
+					<div class="panel-header">
+						<h1>Create API Token</h1>
+					</div>
+					<form method="post" action={ templ.SafeURL("/t/" + p.Team.Name + "/tokens") } class="form">
+						<input type="hidden" name="gorilla.csrf.Token" value={ p.CSRFToken }/>
+						<div class="form-field">
+							<label class="form-label" for="token-name">Token name</label>
+							<input
+								id="token-name"
+								class="form-input"
+								type="text"
+								name="name"
+								required
+								autofocus
+								placeholder="ci-deploy"
+							/>
+						</div>
+						<div class="form-field">
+							<label class="form-label" for="token-expiry">Expires in (days, optional)</label>
+							<input
+								id="token-expiry"
+								class="form-input"
+								type="number"
+								name="expires_days"
+								min="1"
+								placeholder="never"
+							/>
+						</div>
+						<div style="display: flex; gap: var(--space-sm); justify-content: flex-end;">
+							<button type="button" class="button button-ghost" data-on-click="$showCreateModal = false">
+								Cancel
+							</button>
+							<button type="submit" class="button button-primary">
+								Create
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+func tokenStatusClass(status string) string {
+	switch status {
+	case "revoked":
+		return "badge badge-danger"
+	case "expired":
+		return "badge badge-warning"
+	default:
+		return "badge badge-success"
+	}
+}

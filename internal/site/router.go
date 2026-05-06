@@ -60,3 +60,19 @@ func MountImplFeatureShowRoutes(g *echo.Group, deps *handlers.ImplFeatureShowDep
 	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
 	authd.GET("/t/:team_name/i/:impl_slug/f/:feature_name", handlers.ImplFeatureShow(deps))
 }
+
+// MountTeamSettingsRoutes registers the team settings routes.
+func MountTeamSettingsRoutes(g *echo.Group, deps *handlers.TeamSettingsDeps, csrfMiddleware echo.MiddlewareFunc) {
+	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
+	authd.GET("/t/:team_name/settings", handlers.TeamSettings(deps))
+	authd.POST("/t/:team_name/settings/members", handlers.TeamSettingsAddMember(deps))
+	authd.POST("/t/:team_name/settings/members/:user_id/remove", handlers.TeamSettingsRemoveMember(deps))
+}
+
+// MountTeamTokensRoutes registers the team token management routes.
+func MountTeamTokensRoutes(g *echo.Group, deps *handlers.TeamTokensDeps, csrfMiddleware echo.MiddlewareFunc) {
+	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
+	authd.GET("/t/:team_name/tokens", handlers.TeamTokens(deps))
+	authd.POST("/t/:team_name/tokens", handlers.TeamTokensCreate(deps))
+	authd.POST("/t/:team_name/tokens/:prefix/revoke", handlers.TeamTokensRevoke(deps))
+}

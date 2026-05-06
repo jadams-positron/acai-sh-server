@@ -1,0 +1,129 @@
+package views
+
+import (
+	"time"
+
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+)
+
+// TeamSettingsProps drives the /t/{team_name}/settings page.
+type TeamSettingsProps struct {
+	Team          *teams.Team
+	Members       []*teams.Member
+	CSRFToken     string
+	Flash         string
+	FlashType     string // "error" or "success"
+	CanAdmin      bool   // true if current user is an owner
+	CurrentUserID string
+}
+
+templ TeamSettings(p TeamSettingsProps) {
+	@Layout(p.Team.Name + " · Settings") {
+		<header class="page-header">
+			<h1 class="title">{ p.Team.Name } · Settings</h1>
+			<p class="subtitle">
+				<a href={ templ.SafeURL("/t/" + p.Team.Name) }>← { p.Team.Name }</a>
+			</p>
+		</header>
+		if p.Flash != "" {
+			if p.FlashType == "success" {
+				<div class="banner banner-success">{ p.Flash }</div>
+			} else {
+				<div class="banner banner-error">{ p.Flash }</div>
+			}
+		}
+		<div data-signals="{showInviteModal: false}" style="display: grid; gap: var(--space-xl);">
+			<section>
+				<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
+					<h2 style="font-size: var(--text-2xl); margin: 0;">Members</h2>
+					if p.CanAdmin {
+						<button class="button button-primary" data-on-click="$showInviteModal = true" type="button">
+							+ Invite Member
+						</button>
+					}
+				</div>
+				<div class="panel" style="padding: 0;">
+					<table style="width: 100%; border-collapse: collapse;">
+						<thead>
+							<tr style="border-bottom: 1px solid var(--border-subtle);">
+								<th style="text-align: left; padding: var(--space-md);">Email</th>
+								<th style="text-align: left; padding: var(--space-md);">Role</th>
+								<th style="text-align: left; padding: var(--space-md);">Joined</th>
+								if p.CanAdmin {
+									<th style="text-align: right; padding: var(--space-md);"></th>
+								}
+							</tr>
+						</thead>
+						<tbody>
+							for _, m := range p.Members {
+								<tr style="border-bottom: 1px solid var(--border-subtle);">
+									<td style="padding: var(--space-md);">{ m.Email }</td>
+									<td style="padding: var(--space-md);">
+										<span class="badge">{ m.Role }</span>
+									</td>
+									<td style="padding: var(--space-md); color: var(--text-muted);">
+										{ m.JoinedAt.Format(time.DateOnly) }
+									</td>
+									if p.CanAdmin {
+										<td style="text-align: right; padding: var(--space-md);">
+											<form method="post" action={ templ.SafeURL("/t/" + p.Team.Name + "/settings/members/" + m.UserID + "/remove") } style="display: inline;">
+												<input type="hidden" name="gorilla.csrf.Token" value={ p.CSRFToken }/>
+												<button type="submit" class="button button-ghost" style="color: var(--color-danger); font-size: var(--text-sm);">
+													Remove
+												</button>
+											</form>
+										</td>
+									}
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</section>
+			if p.CanAdmin {
+				<div
+					data-show="$showInviteModal"
+					style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100;"
+				>
+					<div class="panel" style="max-width: 420px; width: 90%;" data-on-click__stop>
+						<div class="panel-header">
+							<h1>Invite Member</h1>
+						</div>
+						<form method="post" action={ templ.SafeURL("/t/" + p.Team.Name + "/settings/members") } class="form">
+							<input type="hidden" name="gorilla.csrf.Token" value={ p.CSRFToken }/>
+							<div class="form-field">
+								<label class="form-label" for="invite-email">Email address</label>
+								<input
+									id="invite-email"
+									class="form-input"
+									type="email"
+									name="email"
+									required
+									autofocus
+									placeholder="user@example.com"
+								/>
+							</div>
+							<div class="form-field">
+								<label class="form-label" for="invite-role">Role</label>
+								<select id="invite-role" class="form-input" name="role">
+									<option value="member">Member</option>
+									<option value="developer">Developer</option>
+									<option value="maintainer">Maintainer</option>
+									<option value="owner">Owner</option>
+								</select>
+							</div>
+							<div style="display: flex; gap: var(--space-sm); justify-content: flex-end;">
+								<button type="button" class="button button-ghost" data-on-click="$showInviteModal = false">
+									Cancel
+								</button>
+								<button type="submit" class="button button-primary">
+									Invite
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			}
+		</div>
+	}
+}
