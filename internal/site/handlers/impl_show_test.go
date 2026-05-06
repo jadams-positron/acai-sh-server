@@ -22,8 +22,21 @@ func TestImplShow_RendersImplWithFeatures(t *testing.T) {
 		LastSeenCommit: "abcdef0123456789abcdef0123456789abcdef01",
 	})
 	testfx.SeedTrackedBranch(t, app.DB, impl, branch)
-	testfx.SeedSpec(t, app.DB, product, branch, testfx.SeedSpecOpts{FeatureName: "feature-alpha"})
-	testfx.SeedSpec(t, app.DB, product, branch, testfx.SeedSpecOpts{FeatureName: "feature-beta"})
+	testfx.SeedSpec(t, app.DB, product, branch, testfx.SeedSpecOpts{
+		FeatureName: "feature-alpha",
+		Requirements: map[string]any{
+			"ACID.1": map[string]any{"requirement": "first ACID"},
+			"ACID.2": map[string]any{"requirement": "second ACID"},
+			"ACID.3": map[string]any{"requirement": "third ACID"},
+		},
+	})
+	testfx.SeedSpec(t, app.DB, product, branch, testfx.SeedSpecOpts{
+		FeatureName: "feature-beta",
+		Requirements: map[string]any{
+			"ACID.A": map[string]any{"requirement": "alpha"},
+			"ACID.B": map[string]any{"requirement": "beta"},
+		},
+	})
 
 	slug := makeImplSlug(impl)
 	client := testfx.LoggedInClient(t, app, user)
@@ -40,10 +53,14 @@ func TestImplShow_RendersImplWithFeatures(t *testing.T) {
 		`/t/implshow-team/i/` + slug + `/f/feature-alpha`, // feature drill-down
 		`/t/implshow-team/i/` + slug + `/f/feature-beta`,
 		`root impl`,        // no parent
-		`Tracked branches`, // new section header
+		`Tracked branches`, // tracked branches section header
 		`>main</a>`,        // branch name link
 		`acme/ledger`,      // repo (after shortenRepoURI)
 		`abcdef0`,          // short commit
+		// New: progress overview banner with aggregate stats.
+		`>Progress<`,
+		`acceptance criteria`,
+		`>complete</div>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("expected body to contain %q; got: %.800s", want, body)

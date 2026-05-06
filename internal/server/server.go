@@ -131,6 +131,7 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Teams:           deps.Teams,
 		Implementations: deps.Implementations,
 		Specs:           deps.Specs,
+		FeatureView:     featureViewSvc,
 	}
 	site.MountImplShowRoutes(browser, implShowDeps, csrfMW)
 	featuresIndexDeps := &handlers.FeaturesIndexDeps{

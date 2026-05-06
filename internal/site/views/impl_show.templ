@@ -1,9 +1,12 @@
 package views
 
 import (
+	"fmt"
+
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
 	domainspecs "github.com/jadams-positron/acai-sh-server/internal/domain/specs"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+	"github.com/jadams-positron/acai-sh-server/internal/services"
 )
 
 // ImplShowProps drives the /t/{team_name}/i/{impl_slug} page.
@@ -13,7 +16,7 @@ type ImplShowProps struct {
 	Implementation  *implementations.Implementation
 	ImplSlug        string
 	Parent          *implementations.Implementation // nil if no parent
-	FeatureNames    []string                        // distinct features under the impl's product
+	Overview        *services.ImplOverview          // per-feature progress + aggregate
 	TrackedBranches []*domainspecs.Branch           // branches feeding this impl
 }
 
@@ -41,6 +44,10 @@ templ ImplShow(p ImplShowProps) {
 				<p class="subtitle">{ *p.Implementation.Description }</p>
 			}
 		</header>
+
+		if p.Overview != nil && p.Overview.AggregateTotal > 0 {
+			@implOverviewBanner(p.Overview)
+		}
 
 		if len(p.TrackedBranches) > 0 {
 			<section style="margin-bottom: var(--space-xl);">
@@ -80,29 +87,85 @@ templ ImplShow(p ImplShowProps) {
 
 		<section>
 			<h2 style="font-size: var(--text-2xl); margin: 0 0 var(--space-md);">Features</h2>
-			if len(p.FeatureNames) == 0 {
+			if p.Overview == nil || len(p.Overview.Features) == 0 {
 				<div class="empty-state">
-					<p>No features yet for this product. Push a spec via <code>acai push</code>.</p>
+					<p>No features yet for this impl. Push a spec via <code>acai push</code>.</p>
 				</div>
 			} else {
 				<div class="panel" style="padding: 0;">
-					<ul style="list-style: none; margin: 0; padding: 0;">
-						for i, name := range p.FeatureNames {
-							if i > 0 {
-								<li style="border-top: 1px solid var(--border-subtle);"></li>
+					<table style="width: 100%; border-collapse: collapse;">
+						<thead>
+							<tr style="border-bottom: 1px solid var(--border-subtle); text-align: left;">
+								<th style="padding: var(--space-md);">Feature</th>
+								<th style="padding: var(--space-md); width: 35%;">Progress</th>
+								<th style="padding: var(--space-md); text-align: right;">Status</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, f := range p.Overview.Features {
+								@implFeatureRow(p.Team.Name, p.ImplSlug, f)
 							}
-							<li>
-								<a
-									href={ templ.SafeURL("/t/" + p.Team.Name + "/i/" + p.ImplSlug + "/f/" + name) }
-									style="display: block; padding: var(--space-md); color: var(--fg); text-decoration: none;"
-								>
-									{ name }
-								</a>
-							</li>
-						}
-					</ul>
+						</tbody>
+					</table>
 				</div>
 			}
 		</section>
 	}
+}
+
+templ implOverviewBanner(o *services.ImplOverview) {
+	<section class="panel" style="margin-bottom: var(--space-xl);">
+		<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-md); gap: var(--space-md); flex-wrap: wrap;">
+			<div>
+				<h2 style="font-size: var(--text-xl); margin: 0;">Progress</h2>
+				<p class="subtitle" style="margin: var(--space-xs) 0 0;">
+					{ fmt.Sprintf("%d feature", len(o.Features)) }
+					if len(o.Features) != 1 {
+						s
+					}
+					{ " · " }
+					{ fmt.Sprintf("%d acceptance criteria", o.AggregateTotal) }
+				</p>
+			</div>
+			<div style="text-align: right; font-size: var(--text-2xl); font-weight: 600;">
+				{ fmt.Sprintf("%d%%", percentInt(o.AggregateCounts.Completed+o.AggregateCounts.Accepted, o.AggregateTotal)) }
+				<div class="subtitle" style="font-size: var(--text-sm); font-weight: 400; margin-top: 2px;">complete</div>
+			</div>
+		</div>
+		@progressBar(o.AggregateCounts, o.AggregateTotal)
+		<div style="margin-top: var(--space-md);">
+			@statusLegend(o.AggregateCounts)
+		</div>
+	</section>
+}
+
+templ implFeatureRow(teamName, implSlugStr string, f *services.ImplFeatureSummary) {
+	<tr style="border-top: 1px solid var(--border-subtle);">
+		<td style="padding: var(--space-md);">
+			<a href={ templ.SafeURL("/t/" + teamName + "/i/" + implSlugStr + "/f/" + f.FeatureName) }>
+				{ f.FeatureName }
+			</a>
+			<div class="subtitle" style="font-size: var(--text-xs); margin-top: 2px;">
+				{ fmt.Sprintf("%d acceptance criteria", f.TotalRequirements) }
+			</div>
+		</td>
+		<td style="padding: var(--space-md); vertical-align: middle;">
+			@progressBar(f.Counts, f.TotalRequirements)
+		</td>
+		<td style="padding: var(--space-md); text-align: right; font-size: var(--text-sm);">
+			@statusLegend(f.Counts)
+		</td>
+	</tr>
+}
+
+// percentInt returns the integer percentage of part out of total, capping at 100.
+func percentInt(part, total int) int {
+	if total <= 0 {
+		return 0
+	}
+	v := (part * 100) / total
+	if v > 100 {
+		return 100
+	}
+	return v
 }
