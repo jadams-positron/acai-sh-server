@@ -108,6 +108,10 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 // Handler returns the underlying HTTP handler. Useful for httptest.NewServer.
 func (s *Server) Handler() http.Handler { return s.echo }
 
+// Echo returns the underlying *echo.Echo instance. Useful for test harnesses
+// that need to call ServeHTTP directly without binding a listener.
+func (s *Server) Echo() *echo.Echo { return s.echo }
+
 // Run starts the listener on cfg.HTTPPort and blocks until ctx is canceled.
 func (s *Server) Run(ctx context.Context, addrCh chan<- string) error {
 	addr := net.JoinHostPort("0.0.0.0", strconv.Itoa(s.cfg.HTTPPort))
