@@ -6,6 +6,7 @@ require (
 	github.com/a-h/templ v0.3.1001
 	github.com/getkin/kin-openapi v0.137.0
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/securecookie v1.1.2
 	github.com/gorilla/sessions v1.4.0
 	github.com/labstack/echo/v4 v4.15.2
 	github.com/mailgun/mailgun-go/v4 v4.23.0
@@ -22,7 +23,6 @@ require (
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect
 	github.com/go-openapi/swag v0.23.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/labstack/gommon v0.5.0 // indirect
