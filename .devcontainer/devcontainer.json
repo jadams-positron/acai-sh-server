@@ -1,7 +1,7 @@
 {
     "name": "acai",
     "dockerComposeFile": ["../infra/docker-compose.yml"],
-    "runServices": ["db", "devcontainer", "caddy"],
+    "runServices": ["devcontainer", "caddy"],
     "service": "devcontainer",
     "workspaceFolder": "/app",
     "remoteUser": "dev",
