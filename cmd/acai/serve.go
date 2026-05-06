@@ -14,6 +14,7 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	domainspecs "github.com/jadams-positron/acai-sh-server/internal/domain/specs"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+	internallitestream "github.com/jadams-positron/acai-sh-server/internal/litestream"
 	"github.com/jadams-positron/acai-sh-server/internal/mail"
 	"github.com/jadams-positron/acai-sh-server/internal/ops"
 	"github.com/jadams-positron/acai-sh-server/internal/server"
@@ -87,6 +88,11 @@ func runServe(ctx context.Context, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "server.New: %v\n", err)
 		return 1
 	}
+
+	// Start Litestream replication in the background if S3 is configured.
+	// When LITESTREAM_S3_BUCKET is unset (dev mode), RunWithRecover is a no-op.
+	litestreamCfg := internallitestream.FromEnv(cfg.DatabasePath)
+	go internallitestream.RunWithRecover(ctx, logger, litestreamCfg)
 
 	if err := srv.Run(ctx, nil); err != nil {
 		_, _ = fmt.Fprintf(stderr, "server.Run: %v\n", err)

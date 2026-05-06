@@ -23,6 +23,16 @@ func SetupLogger(cfg *config.Config, w io.Writer) *slog.Logger {
 	return slog.New(handler)
 }
 
+// SetupLoggerMinimal returns a *slog.Logger writing JSON at info level to w,
+// without requiring a full Config. Used by utility subcommands (litestream
+// status, restore) that don't load the full app config.
+func SetupLoggerMinimal(w io.Writer) *slog.Logger {
+	handler := slog.NewJSONHandler(w, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})
+	return slog.New(handler)
+}
+
 func parseLevel(s string) slog.Level {
 	switch s {
 	case "debug":
