@@ -147,14 +147,14 @@ func (r *Repository) ListForTeam(ctx context.Context, teamID string) ([]*Product
 	return out, nil
 }
 
-// validateProductName enforces alphanumeric + hyphens/underscores, 1-64 chars.
+// validateProductName enforces alphanumeric + hyphens/underscores/periods, 1-64 chars.
 func validateProductName(name string) error {
 	if len(name) < 1 || len(name) > 64 {
 		return fmt.Errorf("%w: length %d", ErrInvalidProductName, len(name))
 	}
 	for _, c := range name {
 		ok := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-			(c >= '0' && c <= '9') || c == '-' || c == '_'
+			(c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.'
 		if !ok {
 			return fmt.Errorf("%w: invalid character %q", ErrInvalidProductName, c)
 		}
