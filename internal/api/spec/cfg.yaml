@@ -1,0 +1,9 @@
+package: spec
+output: spec.gen.go
+generate:
+  models: true
+  echo-server: true
+  embedded-spec: true
+  strict-server: false
+output-options:
+  skip-prune: true
