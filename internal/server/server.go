@@ -20,6 +20,8 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/config"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/ops"
 	"github.com/jadams-positron/acai-sh-server/internal/site"
@@ -36,6 +38,8 @@ type RouterDeps struct {
 	SecureCookie    bool
 	Version         string
 	Teams           *teams.Repository
+	Products        *products.Repository
+	Implementations *implementations.Repository
 	Operations      *operations.Config
 	APILimiter      apimiddleware.Limiter
 }
@@ -91,9 +95,11 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 
 	// API tree — bearer auth applied inside Mount.
 	api.Mount(e, &api.Deps{
-		Teams:      deps.Teams,
-		Operations: deps.Operations,
-		Limiter:    deps.APILimiter,
+		Teams:           deps.Teams,
+		Products:        deps.Products,
+		Implementations: deps.Implementations,
+		Operations:      deps.Operations,
+		Limiter:         deps.APILimiter,
 	})
 
 	return &Server{cfg: cfg, logger: logger, db: deps.DB, version: deps.Version, echo: e}, nil

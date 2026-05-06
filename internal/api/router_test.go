@@ -13,6 +13,8 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/api"
 	"github.com/jadams-positron/acai-sh-server/internal/api/middleware"
 	"github.com/jadams-positron/acai-sh-server/internal/api/operations"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
@@ -31,9 +33,11 @@ func setupAPI(t *testing.T) *echo.Echo {
 
 	e := echo.New()
 	api.Mount(e, &api.Deps{
-		Teams:      teams.NewRepository(db),
-		Operations: operations.Load(true),
-		Limiter:    middleware.NewInProcessLimiter(),
+		Teams:           teams.NewRepository(db),
+		Products:        products.NewRepository(db),
+		Implementations: implementations.NewRepository(db),
+		Operations:      operations.Load(true),
+		Limiter:         middleware.NewInProcessLimiter(),
 	})
 	return e
 }

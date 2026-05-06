@@ -10,6 +10,8 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/config"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/mail"
 	"github.com/jadams-positron/acai-sh-server/internal/ops"
@@ -41,6 +43,8 @@ func runServe(ctx context.Context, stderr io.Writer) int {
 
 	repo := accounts.NewRepository(db)
 	teamsRepo := teams.NewRepository(db)
+	productsRepo := products.NewRepository(db)
+	implsRepo := implementations.NewRepository(db)
 	opsCfg := operations.Load(cfg.URLScheme == "http") // non-prod when plain HTTP
 	apiLimiter := middleware.NewInProcessLimiter()
 	sessionStore := auth.NewSessionStore(cfg.SecretKeyBase, cfg.URLScheme == "https")
@@ -71,6 +75,8 @@ func runServe(ctx context.Context, stderr io.Writer) int {
 		SecureCookie:    cfg.URLScheme == "https",
 		Version:         version,
 		Teams:           teamsRepo,
+		Products:        productsRepo,
+		Implementations: implsRepo,
 		Operations:      opsCfg,
 		APILimiter:      apiLimiter,
 	})

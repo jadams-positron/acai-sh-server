@@ -17,9 +17,14 @@ type Querier interface {
 	DeleteEmailTokensForUser(ctx context.Context, arg DeleteEmailTokensForUserParams) error
 	GetAccessTokenByPrefix(ctx context.Context, tokenPrefix string) (AccessToken, error)
 	GetEmailTokenByHashAndContext(ctx context.Context, arg GetEmailTokenByHashAndContextParams) (EmailToken, error)
+	GetProductByTeamAndName(ctx context.Context, arg GetProductByTeamAndNameParams) (Product, error)
 	GetTeamByID(ctx context.Context, id string) (Team, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
+	ListImplementationsByBranch(ctx context.Context, arg ListImplementationsByBranchParams) ([]ListImplementationsByBranchRow, error)
+	ListImplementationsByProduct(ctx context.Context, arg ListImplementationsByProductParams) ([]ListImplementationsByProductRow, error)
+	ListImplementationsByProductAndBranch(ctx context.Context, arg ListImplementationsByProductAndBranchParams) ([]ListImplementationsByProductAndBranchRow, error)
+	ListImplementationsByTeam(ctx context.Context, teamID string) ([]ListImplementationsByTeamRow, error)
 	MarkUserConfirmed(ctx context.Context, arg MarkUserConfirmedParams) error
 	// Ping returns 1 if the DB is reachable. Used by /_health.
 	Ping(ctx context.Context) (int64, error)
