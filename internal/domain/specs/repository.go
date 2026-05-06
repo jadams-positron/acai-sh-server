@@ -120,6 +120,21 @@ func (r *Repository) FirstTrackedBranch(ctx context.Context, implID string) (*Br
 	return branchFromRow(rows[0]), nil
 }
 
+// ListTrackedBranchesForImpl returns every branch the impl tracks, sorted by
+// branches.updated_at DESC. Empty slice (not error) when the impl has none.
+func (r *Repository) ListTrackedBranchesForImpl(ctx context.Context, implID string) ([]*Branch, error) {
+	q := sqlc.New(r.db.Read)
+	rows, err := q.ListBranchesForImplementation(ctx, implID)
+	if err != nil {
+		return nil, fmt.Errorf("specs: ListBranchesForImplementation: %w", err)
+	}
+	out := make([]*Branch, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, branchFromRow(row))
+	}
+	return out, nil
+}
+
 // ListBranchesForTeam returns all branches in the team, newest-updated first.
 func (r *Repository) ListBranchesForTeam(ctx context.Context, teamID string) ([]*Branch, error) {
 	q := sqlc.New(r.db.Read)

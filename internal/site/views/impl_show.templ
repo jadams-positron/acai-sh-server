@@ -2,17 +2,19 @@ package views
 
 import (
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
+	domainspecs "github.com/jadams-positron/acai-sh-server/internal/domain/specs"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 )
 
 // ImplShowProps drives the /t/{team_name}/i/{impl_slug} page.
 type ImplShowProps struct {
-	Shell          ShellProps
-	Team           *teams.Team
-	Implementation *implementations.Implementation
-	ImplSlug       string
-	Parent         *implementations.Implementation // nil if no parent
-	FeatureNames   []string                        // distinct features under the impl's product
+	Shell           ShellProps
+	Team            *teams.Team
+	Implementation  *implementations.Implementation
+	ImplSlug        string
+	Parent          *implementations.Implementation // nil if no parent
+	FeatureNames    []string                        // distinct features under the impl's product
+	TrackedBranches []*domainspecs.Branch           // branches feeding this impl
 }
 
 templ ImplShow(p ImplShowProps) {
@@ -39,6 +41,42 @@ templ ImplShow(p ImplShowProps) {
 				<p class="subtitle">{ *p.Implementation.Description }</p>
 			}
 		</header>
+
+		if len(p.TrackedBranches) > 0 {
+			<section style="margin-bottom: var(--space-xl);">
+				<h2 style="font-size: var(--text-2xl); margin: 0 0 var(--space-md);">Tracked branches</h2>
+				<div class="panel" style="padding: 0;">
+					<table style="width: 100%; border-collapse: collapse;">
+						<thead>
+							<tr style="border-bottom: 1px solid var(--border-subtle); text-align: left;">
+								<th style="padding: var(--space-md);">Branch</th>
+								<th style="padding: var(--space-md);">Repo</th>
+								<th style="padding: var(--space-md);">Last commit</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, b := range p.TrackedBranches {
+								<tr style="border-top: 1px solid var(--border-subtle);">
+									<td style="padding: var(--space-md); font-family: var(--font-mono); font-size: var(--text-sm);">
+										<a href={ templ.SafeURL("/t/" + p.Team.Name + "/branches") }>{ b.BranchName }</a>
+									</td>
+									<td style="padding: var(--space-md); font-family: var(--font-mono); font-size: var(--text-sm); color: var(--muted);">
+										{ shortenRepoURI(b.RepoURI) }
+									</td>
+									<td style="padding: var(--space-md); font-family: var(--font-mono); font-size: var(--text-sm); color: var(--muted);">
+										if b.LastSeenCommit != "" {
+											{ shortCommit(b.LastSeenCommit) }
+										} else {
+											<span class="subtitle">—</span>
+										}
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</section>
+		}
 
 		<section>
 			<h2 style="font-size: var(--text-2xl); margin: 0 0 var(--space-md);">Features</h2>
