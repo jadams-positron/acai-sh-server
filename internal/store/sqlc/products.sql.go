@@ -71,3 +71,42 @@ func (q *Queries) GetProductByTeamAndName(ctx context.Context, arg GetProductByT
 	)
 	return i, err
 }
+
+const listProductsForTeam = `-- name: ListProductsForTeam :many
+SELECT id, team_id, name, description, is_active, inserted_at, updated_at
+FROM products
+WHERE team_id = ?
+  AND is_active = 1
+ORDER BY name
+`
+
+func (q *Queries) ListProductsForTeam(ctx context.Context, teamID string) ([]Product, error) {
+	rows, err := q.db.QueryContext(ctx, listProductsForTeam, teamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Product{}
+	for rows.Next() {
+		var i Product
+		if err := rows.Scan(
+			&i.ID,
+			&i.TeamID,
+			&i.Name,
+			&i.Description,
+			&i.IsActive,
+			&i.InsertedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

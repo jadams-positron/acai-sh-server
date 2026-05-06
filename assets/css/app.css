@@ -336,6 +336,20 @@ a:hover {
     border-radius: var(--radius-md);
 }
 
+/* === Badge === */
+.badge {
+    display: inline-block;
+    padding: 2px var(--space-sm);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: rgba(var(--color-accent-rgb), 0.12);
+    border: 1px solid rgba(var(--color-accent-rgb), 0.25);
+}
+
 /* === Responsive === */
 @media (max-width: 640px) {
     .topbar { padding: var(--space-md) 20px; }

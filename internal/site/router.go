@@ -35,3 +35,10 @@ func MountTeamsRoutes(g *echo.Group, deps *handlers.TeamsDeps, csrfMiddleware ec
 	authd.GET("/teams", handlers.TeamsIndex(deps))
 	authd.POST("/teams", handlers.TeamsCreate(deps))
 }
+
+// MountTeamShowRoutes registers the team detail routes (/t/:team_name, /t/:team_name/products).
+func MountTeamShowRoutes(g *echo.Group, deps *handlers.TeamShowDeps, csrfMiddleware echo.MiddlewareFunc) {
+	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
+	authd.GET("/t/:team_name", handlers.TeamShow(deps))
+	authd.POST("/t/:team_name/products", handlers.TeamCreateProduct(deps))
+}

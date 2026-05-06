@@ -9,3 +9,10 @@ LIMIT 1;
 INSERT INTO products (id, team_id, name, is_active, inserted_at, updated_at)
 VALUES (?, ?, ?, 1, ?, ?)
 RETURNING *;
+
+-- name: ListProductsForTeam :many
+SELECT *
+FROM products
+WHERE team_id = ?
+  AND is_active = 1
+ORDER BY name;
