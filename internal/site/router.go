@@ -48,3 +48,9 @@ func MountProductShowRoutes(g *echo.Group, deps *handlers.ProductShowDeps, csrfM
 	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
 	authd.GET("/t/:team_name/p/:product_name", handlers.ProductShow(deps))
 }
+
+// MountFeatureShowRoutes registers the feature dashboard route (/t/:team_name/f/:feature_name).
+func MountFeatureShowRoutes(g *echo.Group, deps *handlers.FeatureShowDeps, csrfMiddleware echo.MiddlewareFunc) {
+	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
+	authd.GET("/t/:team_name/f/:feature_name", handlers.FeatureShow(deps))
+}

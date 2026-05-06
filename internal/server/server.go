@@ -25,6 +25,7 @@ import (
 	domainspecs "github.com/jadams-positron/acai-sh-server/internal/domain/specs"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/ops"
+	"github.com/jadams-positron/acai-sh-server/internal/services"
 	"github.com/jadams-positron/acai-sh-server/internal/site"
 	"github.com/jadams-positron/acai-sh-server/internal/site/handlers"
 	"github.com/jadams-positron/acai-sh-server/internal/store"
@@ -106,6 +107,13 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Specs:           deps.Specs,
 	}
 	site.MountProductShowRoutes(browser, productShowDeps, csrfMW)
+	featureViewSvc := services.NewFeatureViewService(deps.Products, deps.Implementations, deps.Specs)
+	featureShowDeps := &handlers.FeatureShowDeps{
+		Logger:      logger,
+		Teams:       deps.Teams,
+		FeatureView: featureViewSvc,
+	}
+	site.MountFeatureShowRoutes(browser, featureShowDeps, csrfMW)
 
 	// Static assets — public, no session.
 	handlers.MountStatic(e.Group(""))
