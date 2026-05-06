@@ -212,7 +212,7 @@ func TestPush_SpecsOnly_UpdatesExisting(t *testing.T) {
 	branch := testfx.SeedBranch(t, fx.app.DB, fx.team, testfx.SeedBranchOpts{
 		RepoURI:        "github.com/test/repo",
 		BranchName:     "main",
-		LastSeenCommit: "old-commit",
+		LastSeenCommit: "aabbcc1",
 	})
 	testfx.SeedSpec(t, fx.app.DB, fx.product, branch, testfx.SeedSpecOpts{
 		FeatureName: "auth-feature",
@@ -223,12 +223,12 @@ func TestPush_SpecsOnly_UpdatesExisting(t *testing.T) {
 
 	body := pushBody{
 		BranchName: "main",
-		CommitHash: "new-commit",
+		CommitHash: "ddeeff2",
 		RepoURI:    "github.com/test/repo",
 		Specs: []pushSpec{
 			{
 				Feature: pushFeature{Name: "auth-feature", Product: "myproduct"},
-				Meta:    pushMeta{Path: "features/auth.yaml", LastSeenCommit: "new-commit"},
+				Meta:    pushMeta{Path: "features/auth.yaml", LastSeenCommit: "ddeeff2"},
 				Requirements: map[string]pushReqDf{
 					"auth-feature.AUTH.1": {Requirement: "Updated: Users can log in"},
 					"auth-feature.AUTH.2": {Requirement: "New requirement"},
@@ -306,7 +306,7 @@ func TestPush_RefsOverrideTrue(t *testing.T) {
 	branch := testfx.SeedBranch(t, fx.app.DB, fx.team, testfx.SeedBranchOpts{
 		RepoURI:        "github.com/test/repo",
 		BranchName:     "main",
-		LastSeenCommit: "old-commit",
+		LastSeenCommit: "aabbcc1",
 	})
 	testfx.SeedTrackedBranch(t, fx.app.DB, fx.impl, branch)
 	testfx.SeedFeatureBranchRef(t, fx.app.DB, branch, "auth-feature", map[string]any{
@@ -317,7 +317,7 @@ func TestPush_RefsOverrideTrue(t *testing.T) {
 	// Push with override=true, only provides AUTH.3.
 	body := pushBody{
 		BranchName:     "main",
-		CommitHash:     "new-commit",
+		CommitHash:     "ddeeff2",
 		RepoURI:        "github.com/test/repo",
 		ProductName:    new("myproduct"),
 		TargetImplName: new("production"),
@@ -350,7 +350,7 @@ func TestPush_RefsOverrideFalse_Merges(t *testing.T) {
 	branch := testfx.SeedBranch(t, fx.app.DB, fx.team, testfx.SeedBranchOpts{
 		RepoURI:        "github.com/test/repo",
 		BranchName:     "main",
-		LastSeenCommit: "old-commit",
+		LastSeenCommit: "aabbcc1",
 	})
 	testfx.SeedTrackedBranch(t, fx.app.DB, fx.impl, branch)
 	testfx.SeedFeatureBranchRef(t, fx.app.DB, branch, "auth-feature", map[string]any{
@@ -360,7 +360,7 @@ func TestPush_RefsOverrideFalse_Merges(t *testing.T) {
 	// Push with override=false (merge), adds AUTH.2.
 	body := pushBody{
 		BranchName:     "main",
-		CommitHash:     "new-commit",
+		CommitHash:     "ddeeff2",
 		RepoURI:        "github.com/test/repo",
 		ProductName:    new("myproduct"),
 		TargetImplName: new("production"),
@@ -384,16 +384,17 @@ func TestPush_RefsOverrideFalse_Merges(t *testing.T) {
 	}
 }
 
-func TestPush_ProductNotFound_422(t *testing.T) {
+func TestPush_AutoCreatesProduct_OnSpecPush(t *testing.T) {
 	fx := setupPush(t)
 
+	// Push a spec referencing a product that does NOT exist yet.
 	body := pushBody{
 		BranchName: "main",
 		CommitHash: "abc1234",
 		RepoURI:    "github.com/test/repo",
 		Specs: []pushSpec{
 			{
-				Feature:      pushFeature{Name: "auth-feature", Product: "nonexistent-product"},
+				Feature:      pushFeature{Name: "auth-feature", Product: "newprod"},
 				Meta:         pushMeta{Path: "features/auth.yaml", LastSeenCommit: "abc1234"},
 				Requirements: map[string]pushReqDf{},
 			},
@@ -401,7 +402,29 @@ func TestPush_ProductNotFound_422(t *testing.T) {
 	}
 
 	resp := fx.app.Client().WithBearer(fx.plaintext).POSTJSON("/api/v1/push", body)
-	resp.AssertStatus(http.StatusUnprocessableEntity)
+	resp.AssertStatus(http.StatusOK)
+
+	var doc pushResp
+	resp.JSON(&doc)
+
+	if doc.Data.SpecsCreated != 1 {
+		t.Errorf("specs_created = %d, want 1", doc.Data.SpecsCreated)
+	}
+	if doc.Data.ProductName == nil || *doc.Data.ProductName != "newprod" {
+		t.Errorf("product_name = %v, want newprod", doc.Data.ProductName)
+	}
+
+	// Verify the product row was created in DB.
+	var count int
+	err := fx.app.DB.Read.QueryRowContext(context.Background(),
+		"SELECT COUNT(*) FROM products WHERE team_id = ? AND name = ?",
+		fx.team.ID, "newprod").Scan(&count)
+	if err != nil {
+		t.Fatalf("DB check: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("DB product count = %d, want 1", count)
+	}
 }
 
 func TestPush_ImplNotFound_422(t *testing.T) {
@@ -435,12 +458,12 @@ func TestPush_TooManySpecs_413(t *testing.T) {
 
 	body := pushBody{
 		BranchName: "main",
-		CommitHash: "abc",
+		CommitHash: "abc1234",
 		RepoURI:    "github.com/test/repo",
 		Specs: []pushSpec{
-			{Feature: pushFeature{Name: "feat-a", Product: "myproduct"}, Meta: pushMeta{Path: "a.yaml", LastSeenCommit: "abc"}, Requirements: map[string]pushReqDf{}},
-			{Feature: pushFeature{Name: "feat-b", Product: "myproduct"}, Meta: pushMeta{Path: "b.yaml", LastSeenCommit: "abc"}, Requirements: map[string]pushReqDf{}},
-			{Feature: pushFeature{Name: "feat-c", Product: "myproduct"}, Meta: pushMeta{Path: "c.yaml", LastSeenCommit: "abc"}, Requirements: map[string]pushReqDf{}},
+			{Feature: pushFeature{Name: "feat-a", Product: "myproduct"}, Meta: pushMeta{Path: "a.yaml", LastSeenCommit: "abc1234"}, Requirements: map[string]pushReqDf{}},
+			{Feature: pushFeature{Name: "feat-b", Product: "myproduct"}, Meta: pushMeta{Path: "b.yaml", LastSeenCommit: "abc1234"}, Requirements: map[string]pushReqDf{}},
+			{Feature: pushFeature{Name: "feat-c", Product: "myproduct"}, Meta: pushMeta{Path: "c.yaml", LastSeenCommit: "abc1234"}, Requirements: map[string]pushReqDf{}},
 		},
 	}
 
@@ -473,7 +496,7 @@ func TestPush_NoBearer_401(t *testing.T) {
 
 	body := pushBody{
 		BranchName: "main",
-		CommitHash: "abc",
+		CommitHash: "abc1234",
 		RepoURI:    "github.com/test/repo",
 	}
 	resp := fx.app.Client().POSTJSON("/api/v1/push", body)

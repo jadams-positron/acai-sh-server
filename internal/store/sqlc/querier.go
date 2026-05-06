@@ -12,6 +12,8 @@ type Querier interface {
 	CreateAccessToken(ctx context.Context, arg CreateAccessTokenParams) (AccessToken, error)
 	CreateBranch(ctx context.Context, arg CreateBranchParams) (Branch, error)
 	CreateEmailToken(ctx context.Context, arg CreateEmailTokenParams) (EmailToken, error)
+	CreateImplementation(ctx context.Context, arg CreateImplementationParams) (Implementation, error)
+	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
 	CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteEmailToken(ctx context.Context, id string) error

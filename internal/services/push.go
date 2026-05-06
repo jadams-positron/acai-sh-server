@@ -4,12 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/specs"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 )
+
+var commitHashRE = regexp.MustCompile(`^[0-9a-fA-F]{7,40}$`)
+
+func isValidCommitHash(s string) bool {
+	return commitHashRE.MatchString(s)
+}
 
 // PushService orchestrates the /api/v1/push write path.
 type PushService struct {
@@ -121,6 +128,11 @@ func (s *PushService) Execute(ctx context.Context, req PushRequest) (*PushResult
 		}
 	}
 
+	// --- Validate commit_hash format ---
+	if !isValidCommitHash(req.CommitHash) {
+		return nil, fmt.Errorf("%w: commit_hash must be a 7-40 character hex string", ErrInvalidRequest)
+	}
+
 	// --- 1. Upsert branch ---
 	branch, _, err := s.specs.UpsertBranch(ctx, req.Team.ID, req.RepoURI, req.BranchName, req.CommitHash)
 	if err != nil {
@@ -131,11 +143,8 @@ func (s *PushService) Execute(ctx context.Context, req PushRequest) (*PushResult
 
 	// --- 2. Process specs ---
 	for _, sp := range req.Specs {
-		prod, err := s.products.GetByTeamAndName(ctx, req.Team.ID, sp.FeatureProduct)
+		prod, err := s.products.GetOrCreate(ctx, req.Team.ID, sp.FeatureProduct)
 		if err != nil {
-			if products.IsNotFound(err) {
-				return nil, fmt.Errorf("%w: product %q not found (auto-create deferred to v2)", ErrInvalidRequest, sp.FeatureProduct)
-			}
 			return nil, err
 		}
 		if result.Product == nil {
@@ -174,7 +183,7 @@ func (s *PushService) Execute(ctx context.Context, req PushRequest) (*PushResult
 			return nil, fmt.Errorf("%w: product_name is required for references", ErrInvalidRequest)
 		}
 		if req.TargetImplName == nil {
-			return nil, fmt.Errorf("%w: target_impl_name is required for references (parent_impl_name auto-creation deferred to v2)", ErrInvalidRequest)
+			return nil, fmt.Errorf("%w: target_impl_name is required for references", ErrInvalidRequest)
 		}
 
 		prod, err := s.products.GetByTeamAndName(ctx, req.Team.ID, *req.ProductName)
@@ -187,10 +196,30 @@ func (s *PushService) Execute(ctx context.Context, req PushRequest) (*PushResult
 
 		impl, err := s.impls.GetByProductAndName(ctx, prod.ID, *req.TargetImplName)
 		if err != nil {
-			if implementations.IsNotFound(err) {
-				return nil, ErrImplementationNotFound
+			if !implementations.IsNotFound(err) {
+				return nil, err
 			}
-			return nil, err
+			// Implementation not found — try parent-based child creation.
+			if req.ParentImplName == nil {
+				return nil, fmt.Errorf("%w: implementation %q not found (and no parent_impl_name to create child from)", ErrInvalidRequest, *req.TargetImplName)
+			}
+			parent, perr := s.impls.GetByProductAndName(ctx, prod.ID, *req.ParentImplName)
+			if perr != nil {
+				if implementations.IsNotFound(perr) {
+					return nil, fmt.Errorf("%w: parent_impl_name %q not found", ErrInvalidRequest, *req.ParentImplName)
+				}
+				return nil, perr
+			}
+			// Create the child implementation.
+			impl, err = s.impls.Create(ctx, implementations.CreateImplementationParams{
+				ProductID:              prod.ID,
+				TeamID:                 req.Team.ID,
+				Name:                   *req.TargetImplName,
+				ParentImplementationID: &parent.ID,
+			})
+			if err != nil {
+				return nil, err
+			}
 		}
 		result.Product = prod
 		result.Implementation = impl

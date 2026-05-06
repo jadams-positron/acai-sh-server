@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/jadams-positron/acai-sh-server/internal/store"
 	"github.com/jadams-positron/acai-sh-server/internal/store/sqlc"
 )
@@ -108,6 +110,41 @@ func (r *Repository) List(ctx context.Context, p ListByTeamParams) ([]*Implement
 	}
 
 	return impls, nil
+}
+
+// CreateImplementationParams holds the inputs for Create.
+type CreateImplementationParams struct {
+	ProductID              string
+	TeamID                 string
+	Name                   string
+	ParentImplementationID *string
+}
+
+// Create inserts a new implementation row and returns it.
+// The caller is responsible for ensuring uniqueness (no duplicate name check here).
+func (r *Repository) Create(ctx context.Context, p CreateImplementationParams) (*Implementation, error) {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("implementations: gen uuid: %w", err)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+
+	q := sqlc.New(r.db.Write)
+	row, err := q.CreateImplementation(ctx, sqlc.CreateImplementationParams{
+		ID:                     id.String(),
+		ProductID:              p.ProductID,
+		TeamID:                 p.TeamID,
+		ParentImplementationID: p.ParentImplementationID,
+		Name:                   p.Name,
+		InsertedAt:             now,
+		UpdatedAt:              now,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("implementations: Create: %w", err)
+	}
+	return fromRow(row.ID, row.ProductID, row.TeamID, row.ParentImplementationID,
+		row.Name, row.Description, row.IsActive,
+		row.InsertedAt, row.UpdatedAt, ""), nil
 }
 
 // GetByProductAndName returns the active implementation under product with the
