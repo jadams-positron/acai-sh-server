@@ -13,7 +13,9 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/api/spec"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
+	domainspecs "github.com/jadams-positron/acai-sh-server/internal/domain/specs"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+	"github.com/jadams-positron/acai-sh-server/internal/services"
 )
 
 // openapiJSON is the canonical OpenAPI spec. It is decoded from the embedded
@@ -35,6 +37,7 @@ type Deps struct {
 	Teams           *teams.Repository
 	Products        *products.Repository
 	Implementations *implementations.Repository
+	Specs           *domainspecs.Repository
 	Operations      *operations.Config
 	Limiter         middleware.Limiter
 }
@@ -57,9 +60,11 @@ func Mount(parent *echo.Echo, deps *Deps) {
 		middleware.RateLimit(deps.Operations.RateLimitForPath, deps.Limiter),
 	)
 
+	fcSvc := services.NewFeatureContextService(deps.Products, deps.Implementations, deps.Specs)
 	srv := &Server{
 		products:        deps.Products,
 		implementations: deps.Implementations,
+		featureContext:  fcSvc,
 	}
 	spec.RegisterHandlers(authd, srv)
 }
@@ -71,6 +76,7 @@ type Server struct {
 	unimplementedServer
 	products        *products.Repository
 	implementations *implementations.Repository
+	featureContext  *services.FeatureContextService
 }
 
 // unimplementedServer satisfies spec.ServerInterface with 501 stubs.

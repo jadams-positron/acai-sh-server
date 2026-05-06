@@ -2,6 +2,7 @@ package implementations
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -25,6 +26,12 @@ type ListByTeamParams struct {
 	RepoURI    *string // requires BranchName
 	BranchName *string // requires RepoURI
 }
+
+// ErrNotFound is returned when no matching implementation exists.
+var ErrNotFound = errors.New("implementations: not found")
+
+// IsNotFound reports whether err is or wraps ErrNotFound.
+func IsNotFound(err error) bool { return errors.Is(err, ErrNotFound) }
 
 // ErrInvalidParams is returned for nonsensical filter combinations.
 var ErrInvalidParams = errors.New("implementations: invalid params")
@@ -101,6 +108,24 @@ func (r *Repository) List(ctx context.Context, p ListByTeamParams) ([]*Implement
 	}
 
 	return impls, nil
+}
+
+// GetByProductAndName returns the active implementation under product with the
+// given name, or ErrNotFound.
+func (r *Repository) GetByProductAndName(ctx context.Context, productID, name string) (*Implementation, error) {
+	q := sqlc.New(r.db.Read)
+	row, err := q.GetImplementationByProductAndName(ctx, sqlc.GetImplementationByProductAndNameParams{
+		ProductID: productID,
+		Name:      name,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("implementations: GetByProductAndName: %w", err)
+	}
+	return fromRow(row.ID, row.ProductID, row.TeamID, row.ParentImplementationID,
+		row.Name, row.Description, row.IsActive, row.InsertedAt, row.UpdatedAt, ""), nil
 }
 
 func fromRow(id, productID, teamID string, parentID *string, name string, description *string, isActive int64,

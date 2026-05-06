@@ -17,15 +17,24 @@ type Querier interface {
 	DeleteEmailTokensForUser(ctx context.Context, arg DeleteEmailTokensForUserParams) error
 	GetAccessTokenByPrefix(ctx context.Context, tokenPrefix string) (AccessToken, error)
 	GetEmailTokenByHashAndContext(ctx context.Context, arg GetEmailTokenByHashAndContextParams) (EmailToken, error)
+	GetFeatureBranchRef(ctx context.Context, arg GetFeatureBranchRefParams) (FeatureBranchRef, error)
+	GetFeatureImplState(ctx context.Context, arg GetFeatureImplStateParams) (FeatureImplState, error)
+	GetImplementationByProductAndName(ctx context.Context, arg GetImplementationByProductAndNameParams) (Implementation, error)
 	GetProductByTeamAndName(ctx context.Context, arg GetProductByTeamAndNameParams) (Product, error)
+	GetSpecByBranchAndFeature(ctx context.Context, arg GetSpecByBranchAndFeatureParams) (Spec, error)
 	GetTeamByID(ctx context.Context, id string) (Team, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
+	ListBranchesForImplementation(ctx context.Context, implementationID string) ([]Branch, error)
 	ListImplementationsByBranch(ctx context.Context, arg ListImplementationsByBranchParams) ([]ListImplementationsByBranchRow, error)
 	ListImplementationsByProduct(ctx context.Context, arg ListImplementationsByProductParams) ([]ListImplementationsByProductRow, error)
 	ListImplementationsByProductAndBranch(ctx context.Context, arg ListImplementationsByProductAndBranchParams) ([]ListImplementationsByProductAndBranchRow, error)
 	ListImplementationsByTeam(ctx context.Context, teamID string) ([]ListImplementationsByTeamRow, error)
 	MarkUserConfirmed(ctx context.Context, arg MarkUserConfirmedParams) error
+	// Of the impl's tracked branches, return the branch with the most-recent
+	// feature_branch_refs.pushed_at for the given feature_name. Used as the
+	// "refs_source" branch when we have multiple tracked branches.
+	PickRefsBranchForFeature(ctx context.Context, arg PickRefsBranchForFeatureParams) (Branch, error)
 	// Ping returns 1 if the DB is reachable. Used by /_health.
 	Ping(ctx context.Context) (int64, error)
 	RevokeAccessToken(ctx context.Context, arg RevokeAccessTokenParams) error
