@@ -104,6 +104,13 @@ gen: gen-templ
     sqlc generate
     @echo "gen: done."
 
+# cli-smoke runs the CLI smoke tests against a live httptest server. Requires
+# the acai CLI binary at /usr/local/bin/acai-darwin-arm64 or ACAI_CLI_BINARY
+# pointing to a valid binary. CI skips cleanly when the binary is absent.
+# Not included in precommit (requires the binary and is intentionally separate).
+cli-smoke:
+    go test -v -run "TestCLISmoke_" ./internal/api/...
+
 # Remove built artifacts.
 clean:
     rm -f acai coverage.txt coverage.html
