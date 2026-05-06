@@ -1,0 +1,70 @@
+package views
+
+import (
+	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+)
+
+// ImplShowProps drives the /t/{team_name}/i/{impl_slug} page.
+type ImplShowProps struct {
+	Shell          ShellProps
+	Team           *teams.Team
+	Implementation *implementations.Implementation
+	ImplSlug       string
+	Parent         *implementations.Implementation // nil if no parent
+	FeatureNames   []string                        // distinct features under the impl's product
+}
+
+templ ImplShow(p ImplShowProps) {
+	@Shell(p.Shell) {
+		<header class="page-header">
+			<h1 class="title">{ p.Implementation.Name }</h1>
+			<p class="subtitle">
+				Product:
+				<a href={ templ.SafeURL("/t/" + p.Team.Name + "/p/" + p.Implementation.ProductName) }>
+					{ p.Implementation.ProductName }
+				</a>
+				if p.Parent != nil {
+					{ " · " }
+					Parent:
+					<a href={ templ.SafeURL("/t/" + p.Team.Name + "/i/" + implSlug(p.Parent)) }>
+						{ p.Parent.Name }
+					</a>
+				} else {
+					{ " · " }
+					<span>root impl</span>
+				}
+			</p>
+			if p.Implementation.Description != nil && *p.Implementation.Description != "" {
+				<p class="subtitle">{ *p.Implementation.Description }</p>
+			}
+		</header>
+
+		<section>
+			<h2 style="font-size: var(--text-2xl); margin: 0 0 var(--space-md);">Features</h2>
+			if len(p.FeatureNames) == 0 {
+				<div class="empty-state">
+					<p>No features yet for this product. Push a spec via <code>acai push</code>.</p>
+				</div>
+			} else {
+				<div class="panel" style="padding: 0;">
+					<ul style="list-style: none; margin: 0; padding: 0;">
+						for i, name := range p.FeatureNames {
+							if i > 0 {
+								<li style="border-top: 1px solid var(--border-subtle);"></li>
+							}
+							<li>
+								<a
+									href={ templ.SafeURL("/t/" + p.Team.Name + "/i/" + p.ImplSlug + "/f/" + name) }
+									style="display: block; padding: var(--space-md); color: var(--fg); text-decoration: none;"
+								>
+									{ name }
+								</a>
+							</li>
+						}
+					</ul>
+				</div>
+			}
+		</section>
+	}
+}

@@ -61,6 +61,18 @@ func MountImplFeatureShowRoutes(g *echo.Group, deps *handlers.ImplFeatureShowDep
 	authd.GET("/t/:team_name/i/:impl_slug/f/:feature_name", handlers.ImplFeatureShow(deps))
 }
 
+// MountImplsIndexRoutes registers the /t/:team_name/implementations route.
+func MountImplsIndexRoutes(g *echo.Group, deps *handlers.ImplsIndexDeps, csrfMiddleware echo.MiddlewareFunc) {
+	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
+	authd.GET("/t/:team_name/implementations", handlers.ImplsIndex(deps))
+}
+
+// MountImplShowRoutes registers the /t/:team_name/i/:impl_slug detail route.
+func MountImplShowRoutes(g *echo.Group, deps *handlers.ImplShowDeps, csrfMiddleware echo.MiddlewareFunc) {
+	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
+	authd.GET("/t/:team_name/i/:impl_slug", handlers.ImplShow(deps))
+}
+
 // MountTeamSettingsRoutes registers the team settings routes.
 func MountTeamSettingsRoutes(g *echo.Group, deps *handlers.TeamSettingsDeps, csrfMiddleware echo.MiddlewareFunc) {
 	authd := g.Group("", csrfMiddleware, auth.RequireAuth)

@@ -1,0 +1,116 @@
+package views
+
+import (
+	"strings"
+
+	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+)
+
+// ImplsIndexProps drives the /t/{team_name}/implementations page.
+type ImplsIndexProps struct {
+	Shell           ShellProps
+	Team            *teams.Team
+	Implementations []*implementations.Implementation
+}
+
+templ ImplsIndex(p ImplsIndexProps) {
+	@Shell(p.Shell) {
+		<header class="page-header">
+			<h1 class="title">Implementations</h1>
+			<p class="subtitle">All implementations across products in <strong>{ p.Team.Name }</strong>.</p>
+		</header>
+		if len(p.Implementations) == 0 {
+			<div class="empty-state">
+				<p>No implementations yet. Create one via <code>acai push --target=&lt;name&gt;</code> on a tracked branch.</p>
+			</div>
+		} else {
+			@implsByProduct(p.Team.Name, groupImplsByProduct(p.Implementations))
+		}
+	}
+}
+
+templ implsByProduct(teamName string, groups []implsGroup) {
+	<div style="display: grid; gap: var(--space-xl);">
+		for _, g := range groups {
+			<section>
+				<h2 style="font-size: var(--text-2xl); margin: 0 0 var(--space-md);">
+					<a href={ templ.SafeURL("/t/" + teamName + "/p/" + g.ProductName) }>{ g.ProductName }</a>
+				</h2>
+				<div class="panel" style="padding: 0;">
+					<table style="width: 100%; border-collapse: collapse;">
+						<thead>
+							<tr style="border-bottom: 1px solid var(--border-subtle); text-align: left;">
+								<th style="padding: var(--space-md);">Implementation</th>
+								<th style="padding: var(--space-md);">Description</th>
+								<th style="padding: var(--space-md);">Lineage</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, impl := range g.Implementations {
+								@implsRow(teamName, impl, g.NameByID)
+							}
+						</tbody>
+					</table>
+				</div>
+			</section>
+		}
+	</div>
+}
+
+templ implsRow(teamName string, impl *implementations.Implementation, nameByID map[string]string) {
+	<tr style="border-top: 1px solid var(--border-subtle);">
+		<td style="padding: var(--space-md);">
+			<a href={ templ.SafeURL("/t/" + teamName + "/i/" + implSlug(impl)) }>{ impl.Name }</a>
+		</td>
+		<td style="padding: var(--space-md);">
+			if impl.Description != nil && *impl.Description != "" {
+				{ *impl.Description }
+			} else {
+				<span class="subtitle">—</span>
+			}
+		</td>
+		<td style="padding: var(--space-md); color: var(--muted); font-size: var(--text-sm);">
+			if impl.ParentImplementationID != nil {
+				if name, ok := nameByID[*impl.ParentImplementationID]; ok {
+					{ "child of " + name }
+				} else {
+					child impl
+				}
+			} else {
+				root impl
+			}
+		</td>
+	</tr>
+}
+
+// implsGroup groups impls under one product.
+type implsGroup struct {
+	ProductName     string
+	Implementations []*implementations.Implementation
+	NameByID        map[string]string // for parent lookup within the group
+}
+
+func groupImplsByProduct(impls []*implementations.Implementation) []implsGroup {
+	idx := map[string]int{}
+	var groups []implsGroup
+	for _, impl := range impls {
+		i, ok := idx[impl.ProductName]
+		if !ok {
+			i = len(groups)
+			idx[impl.ProductName] = i
+			groups = append(groups, implsGroup{
+				ProductName: impl.ProductName,
+				NameByID:    map[string]string{},
+			})
+		}
+		groups[i].Implementations = append(groups[i].Implementations, impl)
+		groups[i].NameByID[impl.ID] = impl.Name
+	}
+	return groups
+}
+
+// implSlug mirrors services.ImplementationCard.ImplementationSlug — name + "-" + uuid-no-dashes.
+func implSlug(impl *implementations.Implementation) string {
+	return impl.Name + "-" + strings.ReplaceAll(impl.ID, "-", "")
+}

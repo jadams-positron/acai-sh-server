@@ -71,7 +71,7 @@ func TestShell_NoActiveTeam_ShowsOnlyYourTeams(t *testing.T) {
 	}
 }
 
-func TestShell_ActiveTeam_SidebarHasOverviewSettingsTokens(t *testing.T) {
+func TestShell_ActiveTeam_SidebarHasFullNav(t *testing.T) {
 	t.Parallel()
 	team := &teams.Team{ID: "t1", Name: "acme"}
 	out := renderShell(t, views.ShellProps{
@@ -83,12 +83,28 @@ func TestShell_ActiveTeam_SidebarHasOverviewSettingsTokens(t *testing.T) {
 
 	for _, want := range []string{
 		`href="/t/acme">Overview`,
+		`href="/t/acme/implementations">Implementations`,
 		`href="/t/acme/settings">Settings`,
 		`is-active" href="/t/acme/tokens">Tokens`, // active highlight
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("Shell sidebar missing %q; got:\n%s", want, out)
 		}
+	}
+}
+
+func TestShell_ImplementationsSectionHighlights(t *testing.T) {
+	t.Parallel()
+	team := &teams.Team{ID: "t1", Name: "acme"}
+	out := renderShell(t, views.ShellProps{
+		Title:         "Implementations",
+		Teams:         []*teams.Team{team},
+		ActiveTeam:    team,
+		ActiveSection: "implementations",
+	})
+
+	if !strings.Contains(out, `is-active" href="/t/acme/implementations">Implementations`) {
+		t.Errorf("expected Implementations nav-item to be active; got:\n%s", out)
 	}
 }
 
