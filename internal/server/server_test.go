@@ -11,9 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jadams-positron/acai-sh-server/internal/api/middleware"
+	"github.com/jadams-positron/acai-sh-server/internal/api/operations"
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/config"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/mail"
 	"github.com/jadams-positron/acai-sh-server/internal/ops"
 	"github.com/jadams-positron/acai-sh-server/internal/server"
@@ -63,6 +66,9 @@ func newTestServer(t *testing.T) (*server.Server, *store.DB) {
 		CSRFKey:         []byte(cfg.SecretKeyBase[:32]),
 		SecureCookie:    false,
 		Version:         "test-version",
+		Teams:           teams.NewRepository(db),
+		Operations:      operations.Load(true),
+		APILimiter:      middleware.NewInProcessLimiter(),
 	})
 	if err != nil {
 		t.Fatalf("server.New: %v", err)
