@@ -17,31 +17,62 @@ func TestProductShow_RendersForMember(t *testing.T) {
 	product := testfx.SeedProduct(t, app.DB, team, testfx.SeedProductOpts{Name: "myproduct"})
 	impl1 := testfx.SeedImplementation(t, app.DB, product, testfx.SeedImplementationOpts{Name: "impl-one"})
 	impl2 := testfx.SeedImplementation(t, app.DB, product, testfx.SeedImplementationOpts{Name: "impl-two"})
-	branch := testfx.SeedBranch(t, app.DB, team, testfx.SeedBranchOpts{})
-	testfx.SeedTrackedBranch(t, app.DB, impl1, branch)
-	testfx.SeedTrackedBranch(t, app.DB, impl2, branch)
-	testfx.SeedSpec(t, app.DB, product, branch, testfx.SeedSpecOpts{FeatureName: "feature-alpha"})
-	testfx.SeedSpec(t, app.DB, product, branch, testfx.SeedSpecOpts{FeatureName: "feature-beta"})
+	// Two repos so the same impl can track both branches (UNIQUE(impl, repo)).
+	branch1 := testfx.SeedBranch(t, app.DB, team, testfx.SeedBranchOpts{
+		RepoURI:    "github.com/acme/myproduct",
+		BranchName: "main",
+	})
+	branch2 := testfx.SeedBranch(t, app.DB, team, testfx.SeedBranchOpts{
+		RepoURI:    "github.com/acme/myproduct-fork",
+		BranchName: "main",
+	})
+	testfx.SeedTrackedBranch(t, app.DB, impl1, branch1)
+	testfx.SeedTrackedBranch(t, app.DB, impl2, branch2)
+	testfx.SeedSpec(t, app.DB, product, branch1, testfx.SeedSpecOpts{
+		FeatureName: "feature-alpha",
+		Requirements: map[string]any{
+			"ACID.1": map[string]any{"requirement": "first"},
+			"ACID.2": map[string]any{"requirement": "second"},
+		},
+	})
+	testfx.SeedSpec(t, app.DB, product, branch1, testfx.SeedSpecOpts{
+		FeatureName: "feature-beta",
+		Requirements: map[string]any{
+			"ACID.A": map[string]any{"requirement": "alpha"},
+		},
+	})
+	testfx.SeedSpec(t, app.DB, product, branch2, testfx.SeedSpecOpts{
+		FeatureName: "feature-alpha",
+		Requirements: map[string]any{
+			"ACID.X": map[string]any{"requirement": "x"},
+		},
+	})
 
 	client := testfx.LoggedInClient(t, app, user)
 	resp := client.GET("/t/prodshow-team/p/myproduct", nil)
 	resp.AssertStatus(http.StatusOK)
 
 	body := string(resp.Body())
-	if !strings.Contains(body, "myproduct") {
-		t.Errorf("expected product name 'myproduct' in body; got: %.500s", body)
-	}
-	if !strings.Contains(body, "impl-one") {
-		t.Errorf("expected impl name 'impl-one' in body; got: %.500s", body)
-	}
-	if !strings.Contains(body, "impl-two") {
-		t.Errorf("expected impl name 'impl-two' in body; got: %.500s", body)
-	}
-	if !strings.Contains(body, "feature-alpha") {
-		t.Errorf("expected feature name 'feature-alpha' in body; got: %.500s", body)
-	}
-	if !strings.Contains(body, "feature-beta") {
-		t.Errorf("expected feature name 'feature-beta' in body; got: %.500s", body)
+	for _, want := range []string{
+		"myproduct",
+		"impl-one",
+		"impl-two",
+		"feature-alpha",
+		"feature-beta",
+		// New: aggregate progress banner.
+		`>Progress<`,
+		`>complete</div>`,
+		`acceptance criteria`,
+		`2 implementations`, // pluralization
+		// Per-impl row indicates lineage + ACID count.
+		`root impl`,
+		// Per-feature row indicates impl coverage.
+		`2 impls`, // feature-alpha tracked by both impls
+		`1 impl`,  // feature-beta tracked by impl-one only
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected %q in product body; got: %.800s", want, body)
+		}
 	}
 }
 

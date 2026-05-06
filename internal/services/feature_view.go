@@ -191,6 +191,100 @@ func (s *FeatureViewService) ResolveImplOverview(ctx context.Context, req ImplOv
 	return out, nil
 }
 
+// ProductImplSummary pairs an implementation with its per-feature progress
+// breakdown. Used as one row in the product overview's Implementations table.
+type ProductImplSummary struct {
+	Implementation *implementations.Implementation
+	Overview       *ImplOverview
+}
+
+// ProductFeatureSummary aggregates one feature's progress across all impls
+// in a product. The TotalRequirements / Counts are the sum across impls,
+// so a feature implemented in 3 impls × 5 ACIDs each shows TotalRequirements=15.
+type ProductFeatureSummary struct {
+	FeatureName       string
+	ImplCount         int
+	TotalRequirements int
+	Counts            StatusCounts
+}
+
+// ProductOverview composes everything the product detail page needs:
+// per-impl summaries, per-feature aggregates across the product's impls,
+// and a top-line aggregate.
+type ProductOverview struct {
+	Impls           []*ProductImplSummary
+	Features        []*ProductFeatureSummary
+	AggregateTotal  int
+	AggregateCounts StatusCounts
+}
+
+// ProductOverviewRequest is the input to ResolveProductOverview.
+type ProductOverviewRequest struct {
+	TeamID    string
+	ProductID string
+}
+
+// ResolveProductOverview composes the product page's roll-ups by walking the
+// product's implementations once and reusing ResolveImplOverview per impl.
+// The per-feature aggregation folds those impl-level summaries by feature name.
+//
+// Cost: O(impls × features-per-impl) underlying queries — same shape as
+// rendering the impl detail page once per impl. Acceptable at typical
+// product sizes; batch with a single SQL roll-up when product cardinality
+// grows.
+func (s *FeatureViewService) ResolveProductOverview(ctx context.Context, req ProductOverviewRequest) (*ProductOverview, error) {
+	impls, err := s.impls.ListByProduct(ctx, req.TeamID, req.ProductID)
+	if err != nil {
+		return nil, fmt.Errorf("services: ResolveProductOverview: list impls: %w", err)
+	}
+
+	out := &ProductOverview{}
+	featureIdx := map[string]*ProductFeatureSummary{}
+	for _, impl := range impls {
+		ov, err := s.ResolveImplOverview(ctx, ImplOverviewRequest{Implementation: impl})
+		if err != nil {
+			return nil, fmt.Errorf("services: ResolveProductOverview: impl %q: %w", impl.Name, err)
+		}
+		out.Impls = append(out.Impls, &ProductImplSummary{
+			Implementation: impl,
+			Overview:       ov,
+		})
+		out.AggregateTotal += ov.AggregateTotal
+		out.AggregateCounts.Null += ov.AggregateCounts.Null
+		out.AggregateCounts.Assigned += ov.AggregateCounts.Assigned
+		out.AggregateCounts.Blocked += ov.AggregateCounts.Blocked
+		out.AggregateCounts.Incomplete += ov.AggregateCounts.Incomplete
+		out.AggregateCounts.Completed += ov.AggregateCounts.Completed
+		out.AggregateCounts.Rejected += ov.AggregateCounts.Rejected
+		out.AggregateCounts.Accepted += ov.AggregateCounts.Accepted
+
+		for _, f := range ov.Features {
+			fs, ok := featureIdx[f.FeatureName]
+			if !ok {
+				fs = &ProductFeatureSummary{FeatureName: f.FeatureName}
+				featureIdx[f.FeatureName] = fs
+				out.Features = append(out.Features, fs)
+			}
+			fs.ImplCount++
+			fs.TotalRequirements += f.TotalRequirements
+			fs.Counts.Null += f.Counts.Null
+			fs.Counts.Assigned += f.Counts.Assigned
+			fs.Counts.Blocked += f.Counts.Blocked
+			fs.Counts.Incomplete += f.Counts.Incomplete
+			fs.Counts.Completed += f.Counts.Completed
+			fs.Counts.Rejected += f.Counts.Rejected
+			fs.Counts.Accepted += f.Counts.Accepted
+		}
+	}
+	sort.Slice(out.Impls, func(i, j int) bool {
+		return out.Impls[i].Implementation.Name < out.Impls[j].Implementation.Name
+	})
+	sort.Slice(out.Features, func(i, j int) bool {
+		return out.Features[i].FeatureName < out.Features[j].FeatureName
+	})
+	return out, nil
+}
+
 // buildStatusCounts walks the states map and counts statuses, treating any
 // requirement without a state as "null".
 func buildStatusCounts(states *specs.FeatureImplState, totalReqs int) StatusCounts {

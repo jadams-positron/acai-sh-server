@@ -1,18 +1,20 @@
 package views
 
 import (
-	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
+	"fmt"
+	"strings"
+
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+	"github.com/jadams-positron/acai-sh-server/internal/services"
 )
 
 // ProductShowProps drives the /t/{team_name}/p/{product_name} page.
 type ProductShowProps struct {
-	Shell           ShellProps
-	Team            *teams.Team
-	Product         *products.Product
-	Implementations []*implementations.Implementation
-	FeatureNames    []string
+	Shell    ShellProps
+	Team     *teams.Team
+	Product  *products.Product
+	Overview *services.ProductOverview
 }
 
 templ ProductShow(p ProductShowProps) {
@@ -24,11 +26,14 @@ templ ProductShow(p ProductShowProps) {
 			}
 		</header>
 
+		if p.Overview != nil && p.Overview.AggregateTotal > 0 {
+			@productOverviewBanner(p.Overview)
+		}
+
 		<div style="display: grid; gap: var(--space-xl);">
-			// Implementations section
 			<section>
 				<h2 style="font-size: var(--text-2xl); margin: 0 0 var(--space-md);">Implementations</h2>
-				if len(p.Implementations) == 0 {
+				if p.Overview == nil || len(p.Overview.Impls) == 0 {
 					<div class="empty-state empty-state-rich">
 						<p class="empty-state-headline">No implementations yet</p>
 						<p>An <strong>implementation</strong> represents one place this product is built — production, a feature branch, a fork. The CLI auto-creates one per branch when you push:</p>
@@ -36,27 +41,28 @@ templ ProductShow(p ProductShowProps) {
 { "acai push --product " + p.Product.Name + " --all" }</code>
 					</div>
 				} else {
-					<div style="display: grid; gap: var(--space-md); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));">
-						for _, impl := range p.Implementations {
-							<div class="panel">
-								<h3 style="margin: 0 0 var(--space-xs); font-size: var(--text-lg);">{ impl.Name }</h3>
-								if impl.Description != nil && *impl.Description != "" {
-									<p class="subtitle" style="margin: 0;">{ *impl.Description }</p>
-								} else if impl.ParentImplementationID != nil {
-									<p class="subtitle" style="margin: 0;">child impl</p>
-								} else {
-									<p class="subtitle" style="margin: 0;">root impl</p>
+					<div class="panel" style="padding: 0;">
+						<table style="width: 100%; border-collapse: collapse;">
+							<thead>
+								<tr style="border-bottom: 1px solid var(--border-subtle); text-align: left;">
+									<th style="padding: var(--space-md);">Implementation</th>
+									<th style="padding: var(--space-md); width: 35%;">Progress</th>
+									<th style="padding: var(--space-md); text-align: right;">Status</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, summary := range p.Overview.Impls {
+									@productImplRow(p.Team.Name, summary)
 								}
-							</div>
-						}
+							</tbody>
+						</table>
 					</div>
 				}
 			</section>
 
-			// Features section
 			<section>
 				<h2 style="font-size: var(--text-2xl); margin: 0 0 var(--space-md);">Features</h2>
-				if len(p.FeatureNames) == 0 {
+				if p.Overview == nil || len(p.Overview.Features) == 0 {
 					<div class="empty-state empty-state-rich">
 						<p class="empty-state-headline">No features yet</p>
 						<p>Features come from <code>*.feature.yaml</code> spec files in your repo. Add a spec, then run:</p>
@@ -64,24 +70,118 @@ templ ProductShow(p ProductShowProps) {
 					</div>
 				} else {
 					<div class="panel" style="padding: 0;">
-						<ul style="list-style: none; margin: 0; padding: 0;">
-							for i, name := range p.FeatureNames {
-								if i > 0 {
-									<li style="border-top: 1px solid var(--border-subtle);"></li>
+						<table style="width: 100%; border-collapse: collapse;">
+							<thead>
+								<tr style="border-bottom: 1px solid var(--border-subtle); text-align: left;">
+									<th style="padding: var(--space-md);">Feature</th>
+									<th style="padding: var(--space-md); width: 35%;">Progress</th>
+									<th style="padding: var(--space-md); text-align: right;">Status</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, f := range p.Overview.Features {
+									@productFeatureRow(p.Team.Name, f)
 								}
-								<li>
-									<a
-										href={ templ.SafeURL("/t/" + p.Team.Name + "/f/" + name) }
-										style="display: block; padding: var(--space-md); color: var(--fg); text-decoration: none;"
-									>
-										{ name }
-									</a>
-								</li>
-							}
-						</ul>
+							</tbody>
+						</table>
 					</div>
 				}
 			</section>
 		</div>
 	}
+}
+
+templ productOverviewBanner(o *services.ProductOverview) {
+	<section class="panel" style="margin-bottom: var(--space-xl);">
+		<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-md); gap: var(--space-md); flex-wrap: wrap;">
+			<div>
+				<h2 style="font-size: var(--text-xl); margin: 0;">Progress</h2>
+				<p class="subtitle" style="margin: var(--space-xs) 0 0;">
+					{ pluralize(len(o.Impls), "implementation") }
+					{ " · " }
+					{ pluralize(len(o.Features), "feature") }
+					{ " · " }
+					{ fmt.Sprintf("%d acceptance criteria", o.AggregateTotal) }
+				</p>
+			</div>
+			<div style="text-align: right; font-size: var(--text-2xl); font-weight: 600;">
+				{ fmt.Sprintf("%d%%", percentInt(o.AggregateCounts.Completed+o.AggregateCounts.Accepted, o.AggregateTotal)) }
+				<div class="subtitle" style="font-size: var(--text-sm); font-weight: 400; margin-top: 2px;">complete</div>
+			</div>
+		</div>
+		@progressBar(o.AggregateCounts, o.AggregateTotal)
+		<div style="margin-top: var(--space-md);">
+			@statusLegend(o.AggregateCounts)
+		</div>
+	</section>
+}
+
+templ productImplRow(teamName string, s *services.ProductImplSummary) {
+	<tr style="border-top: 1px solid var(--border-subtle);">
+		<td style="padding: var(--space-md);">
+			<a href={ templ.SafeURL("/t/" + teamName + "/i/" + productImplSlug(s.Implementation.Name, s.Implementation.ID)) }>
+				{ s.Implementation.Name }
+			</a>
+			<div class="subtitle" style="font-size: var(--text-xs); margin-top: 2px;">
+				if s.Implementation.ParentImplementationID != nil {
+					child impl
+					if s.Overview != nil && s.Overview.AggregateTotal > 0 {
+						{ " · " }
+						{ fmt.Sprintf("%d acceptance criteria", s.Overview.AggregateTotal) }
+					}
+				} else {
+					root impl
+					if s.Overview != nil && s.Overview.AggregateTotal > 0 {
+						{ " · " }
+						{ fmt.Sprintf("%d acceptance criteria", s.Overview.AggregateTotal) }
+					}
+				}
+			</div>
+		</td>
+		<td style="padding: var(--space-md); vertical-align: middle;">
+			if s.Overview != nil && s.Overview.AggregateTotal > 0 {
+				@progressBar(s.Overview.AggregateCounts, s.Overview.AggregateTotal)
+			} else {
+				<span class="subtitle">no specs yet</span>
+			}
+		</td>
+		<td style="padding: var(--space-md); text-align: right; font-size: var(--text-sm);">
+			if s.Overview != nil && s.Overview.AggregateTotal > 0 {
+				@statusLegend(s.Overview.AggregateCounts)
+			}
+		</td>
+	</tr>
+}
+
+templ productFeatureRow(teamName string, f *services.ProductFeatureSummary) {
+	<tr style="border-top: 1px solid var(--border-subtle);">
+		<td style="padding: var(--space-md);">
+			<a href={ templ.SafeURL("/t/" + teamName + "/f/" + f.FeatureName) }>
+				{ f.FeatureName }
+			</a>
+			<div class="subtitle" style="font-size: var(--text-xs); margin-top: 2px;">
+				{ pluralize(f.ImplCount, "impl") }
+			</div>
+		</td>
+		<td style="padding: var(--space-md); vertical-align: middle;">
+			@progressBar(f.Counts, f.TotalRequirements)
+		</td>
+		<td style="padding: var(--space-md); text-align: right; font-size: var(--text-sm);">
+			@statusLegend(f.Counts)
+		</td>
+	</tr>
+}
+
+// pluralize returns "1 thing" / "2 things" with naive English plural-by-s.
+func pluralize(n int, noun string) string {
+	if n == 1 {
+		return fmt.Sprintf("%d %s", n, noun)
+	}
+	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+// productImplSlug mirrors services.ImplementationCard.ImplementationSlug —
+// name + "-" + uuid-no-dashes.
+func productImplSlug(name, id string) string {
+	return name + "-" + strings.ReplaceAll(id, "-", "")
 }
