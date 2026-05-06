@@ -52,3 +52,15 @@ WHERE i.team_id = ?
   AND b.repo_uri = ?
   AND b.branch_name = ?
 ORDER BY i.name;
+
+-- name: ListImplementationsTrackingBranch :many
+SELECT i.id, i.product_id, i.team_id, i.parent_implementation_id,
+       i.name, i.description, i.is_active, i.inserted_at, i.updated_at,
+       p.name AS product_name
+FROM implementations i
+JOIN products p ON p.id = i.product_id
+JOIN tracked_branches tb ON tb.implementation_id = i.id
+WHERE i.team_id = ?
+  AND tb.branch_id = ?
+  AND i.is_active = 1
+ORDER BY i.name;

@@ -3,7 +3,10 @@ package api_test
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
+
+	"github.com/jadams-positron/acai-sh-server/internal/testfx"
 )
 
 // readProductIDByName returns the product ID for (teamID, name) or "" if absent.
@@ -213,5 +216,184 @@ func TestPush_AutoCreatesProduct_IdempotentDoublePush(t *testing.T) {
 	}
 	if count != 1 {
 		t.Errorf("DB product count = %d, want 1 (idempotent)", count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Inference from tracked_branches
+// ---------------------------------------------------------------------------
+
+// TestPush_RefsOnly_InferTargetImpl_OneTracking verifies that when exactly one
+// impl tracks the pushed branch, the server infers it without requiring
+// product_name or target_impl_name in the request.
+func TestPush_RefsOnly_InferTargetImpl_OneTracking(t *testing.T) {
+	fx := setupPush(t)
+
+	// Seed a branch and link the fixture impl to it.
+	branch := testfx.SeedBranch(t, fx.app.DB, fx.team, testfx.SeedBranchOpts{
+		RepoURI:    "github.com/infer/repo",
+		BranchName: "main",
+	})
+	testfx.SeedTrackedBranch(t, fx.app.DB, fx.impl, branch)
+
+	// Push refs-only — no product_name, no target_impl_name.
+	body := pushBody{
+		BranchName: "main",
+		CommitHash: "abc1234",
+		RepoURI:    "github.com/infer/repo",
+		References: &refsPayload{
+			Data: map[string][]codeRefPayload{
+				"auth-feature.AUTH.1": {{Path: "lib/auth.go:42"}},
+			},
+		},
+	}
+
+	resp := fx.app.Client().WithBearer(fx.plaintext).POSTJSON("/api/v1/push", body)
+	resp.AssertStatus(http.StatusOK)
+
+	var doc pushResp
+	resp.JSON(&doc)
+
+	// Inference should have resolved to the fixture's "production" impl.
+	if doc.Data.ImplementationID == nil {
+		t.Fatal("implementation_id should be set when exactly one impl tracks the branch")
+	}
+	if doc.Data.ImplementationName == nil || *doc.Data.ImplementationName != "production" {
+		t.Errorf("implementation_name = %v, want production", doc.Data.ImplementationName)
+	}
+	if doc.Data.ProductName == nil || *doc.Data.ProductName != "myproduct" {
+		t.Errorf("product_name = %v, want myproduct", doc.Data.ProductName)
+	}
+
+	// feature_branch_refs row should be written.
+	refs := readFeatureRefs(t, fx.app.DB, branch.ID, "auth-feature")
+	if len(refs) == 0 {
+		t.Error("feature_branch_refs should have refs for auth-feature")
+	}
+}
+
+// TestPush_RefsOnly_InferTargetImpl_NoTracking verifies that when no impl
+// tracks the pushed branch, the server returns 200 with nil impl/product and
+// still writes feature_branch_refs.
+func TestPush_RefsOnly_InferTargetImpl_NoTracking(t *testing.T) {
+	fx := setupPush(t)
+
+	// No tracked_branches seeded for this repo/branch.
+	body := pushBody{
+		BranchName: "orphan-branch",
+		CommitHash: "abc1234",
+		RepoURI:    "github.com/infer/repo",
+		References: &refsPayload{
+			Data: map[string][]codeRefPayload{
+				"auth-feature.AUTH.1": {{Path: "lib/auth.go:1"}},
+			},
+		},
+	}
+
+	resp := fx.app.Client().WithBearer(fx.plaintext).POSTJSON("/api/v1/push", body)
+	resp.AssertStatus(http.StatusOK)
+
+	var doc pushResp
+	resp.JSON(&doc)
+
+	if doc.Data.ImplementationID != nil {
+		t.Errorf("implementation_id = %v, want nil (0 tracking impls)", doc.Data.ImplementationID)
+	}
+	if doc.Data.ProductName != nil {
+		t.Errorf("product_name = %v, want nil (0 tracking impls)", doc.Data.ProductName)
+	}
+
+	// Refs must still be persisted.
+	branchID := readBranchID(t, fx.app.DB, fx.team.ID, "github.com/infer/repo", "orphan-branch")
+	refs := readFeatureRefs(t, fx.app.DB, branchID, "auth-feature")
+	if len(refs) == 0 {
+		t.Error("feature_branch_refs should be written even when no impl tracks the branch")
+	}
+}
+
+// TestPush_RefsOnly_InferTargetImpl_MultiTracking_NoTarget_422 verifies that
+// when more than one impl tracks the branch and target_impl_name is absent the
+// server returns 422 with an informative message.
+func TestPush_RefsOnly_InferTargetImpl_MultiTracking_NoTarget_422(t *testing.T) {
+	fx := setupPush(t)
+
+	// Seed a second product + impl so two impls track the same branch.
+	prod2 := testfx.SeedProduct(t, fx.app.DB, fx.team, testfx.SeedProductOpts{Name: "otherproduct"})
+	impl2 := testfx.SeedImplementation(t, fx.app.DB, prod2, testfx.SeedImplementationOpts{Name: "staging"})
+
+	branch := testfx.SeedBranch(t, fx.app.DB, fx.team, testfx.SeedBranchOpts{
+		RepoURI:    "github.com/multi/repo",
+		BranchName: "main",
+	})
+	testfx.SeedTrackedBranch(t, fx.app.DB, fx.impl, branch)
+	testfx.SeedTrackedBranch(t, fx.app.DB, impl2, branch)
+
+	// Push without target_impl_name → must 422.
+	body := pushBody{
+		BranchName: "main",
+		CommitHash: "abc1234",
+		RepoURI:    "github.com/multi/repo",
+		References: &refsPayload{
+			Data: map[string][]codeRefPayload{
+				"auth-feature.AUTH.1": {{Path: "lib/auth.go:1"}},
+			},
+		},
+	}
+
+	resp := fx.app.Client().WithBearer(fx.plaintext).POSTJSON("/api/v1/push", body)
+	resp.AssertStatus(http.StatusUnprocessableEntity)
+
+	// Verify the error body mentions "multiple implementations".
+	raw := string(resp.Body())
+	if !strings.Contains(raw, "multiple implementations") {
+		t.Errorf("error body should mention 'multiple implementations', got: %s", raw)
+	}
+}
+
+// TestPush_RefsOnly_InferTargetImpl_MultiTracking_WithTarget verifies that when
+// multiple impls track the same branch, providing target_impl_name disambiguates.
+func TestPush_RefsOnly_InferTargetImpl_MultiTracking_WithTarget(t *testing.T) {
+	fx := setupPush(t)
+
+	// Seed a second product + impl.
+	prod2 := testfx.SeedProduct(t, fx.app.DB, fx.team, testfx.SeedProductOpts{Name: "otherproduct"})
+	impl2 := testfx.SeedImplementation(t, fx.app.DB, prod2, testfx.SeedImplementationOpts{Name: "staging"})
+
+	branch := testfx.SeedBranch(t, fx.app.DB, fx.team, testfx.SeedBranchOpts{
+		RepoURI:    "github.com/multi2/repo",
+		BranchName: "main",
+	})
+	testfx.SeedTrackedBranch(t, fx.app.DB, fx.impl, branch) // "production"
+	testfx.SeedTrackedBranch(t, fx.app.DB, impl2, branch)   // "staging"
+
+	// Push with target_impl_name="staging" but no product_name.
+	stagingName := "staging"
+	body := pushBody{
+		BranchName:     "main",
+		CommitHash:     "abc1234",
+		RepoURI:        "github.com/multi2/repo",
+		TargetImplName: &stagingName,
+		// No product_name → inference path with disambiguation.
+		References: &refsPayload{
+			Data: map[string][]codeRefPayload{
+				"auth-feature.AUTH.1": {{Path: "lib/staging.go:7"}},
+			},
+		},
+	}
+
+	resp := fx.app.Client().WithBearer(fx.plaintext).POSTJSON("/api/v1/push", body)
+	resp.AssertStatus(http.StatusOK)
+
+	var doc pushResp
+	resp.JSON(&doc)
+
+	if doc.Data.ImplementationName == nil || *doc.Data.ImplementationName != "staging" {
+		t.Errorf("implementation_name = %v, want staging", doc.Data.ImplementationName)
+	}
+
+	// Refs should be written under the branch.
+	refs := readFeatureRefs(t, fx.app.DB, branch.ID, "auth-feature")
+	if len(refs) == 0 {
+		t.Error("feature_branch_refs should be written for auth-feature")
 	}
 }

@@ -314,3 +314,68 @@ func (q *Queries) ListImplementationsByTeam(ctx context.Context, teamID string) 
 	}
 	return items, nil
 }
+
+const listImplementationsTrackingBranch = `-- name: ListImplementationsTrackingBranch :many
+SELECT i.id, i.product_id, i.team_id, i.parent_implementation_id,
+       i.name, i.description, i.is_active, i.inserted_at, i.updated_at,
+       p.name AS product_name
+FROM implementations i
+JOIN products p ON p.id = i.product_id
+JOIN tracked_branches tb ON tb.implementation_id = i.id
+WHERE i.team_id = ?
+  AND tb.branch_id = ?
+  AND i.is_active = 1
+ORDER BY i.name
+`
+
+type ListImplementationsTrackingBranchParams struct {
+	TeamID   string
+	BranchID string
+}
+
+type ListImplementationsTrackingBranchRow struct {
+	ID                     string
+	ProductID              string
+	TeamID                 string
+	ParentImplementationID *string
+	Name                   string
+	Description            *string
+	IsActive               int64
+	InsertedAt             string
+	UpdatedAt              string
+	ProductName            string
+}
+
+func (q *Queries) ListImplementationsTrackingBranch(ctx context.Context, arg ListImplementationsTrackingBranchParams) ([]ListImplementationsTrackingBranchRow, error) {
+	rows, err := q.db.QueryContext(ctx, listImplementationsTrackingBranch, arg.TeamID, arg.BranchID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListImplementationsTrackingBranchRow{}
+	for rows.Next() {
+		var i ListImplementationsTrackingBranchRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ProductID,
+			&i.TeamID,
+			&i.ParentImplementationID,
+			&i.Name,
+			&i.Description,
+			&i.IsActive,
+			&i.InsertedAt,
+			&i.UpdatedAt,
+			&i.ProductName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

@@ -147,6 +147,27 @@ func (r *Repository) Create(ctx context.Context, p CreateImplementationParams) (
 		row.InsertedAt, row.UpdatedAt, ""), nil
 }
 
+// ListTrackingBranch returns the active implementations under team that track
+// the given branch (by branch ID). Used by /push to infer the target impl
+// when the caller doesn't pass target_impl_name.
+func (r *Repository) ListTrackingBranch(ctx context.Context, teamID, branchID string) ([]*Implementation, error) {
+	q := sqlc.New(r.db.Read)
+	rows, err := q.ListImplementationsTrackingBranch(ctx, sqlc.ListImplementationsTrackingBranchParams{
+		TeamID:   teamID,
+		BranchID: branchID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("implementations: ListTrackingBranch: %w", err)
+	}
+	out := make([]*Implementation, 0, len(rows))
+	for i := range rows {
+		row := &rows[i]
+		out = append(out, fromRow(row.ID, row.ProductID, row.TeamID, row.ParentImplementationID,
+			row.Name, row.Description, row.IsActive, row.InsertedAt, row.UpdatedAt, row.ProductName))
+	}
+	return out, nil
+}
+
 // GetByProductAndName returns the active implementation under product with the
 // given name, or ErrNotFound.
 func (r *Repository) GetByProductAndName(ctx context.Context, productID, name string) (*Implementation, error) {
