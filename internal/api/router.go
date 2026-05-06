@@ -61,10 +61,12 @@ func Mount(parent *echo.Echo, deps *Deps) {
 	)
 
 	fcSvc := services.NewFeatureContextService(deps.Products, deps.Implementations, deps.Specs)
+	ifSvc := services.NewImplementationFeaturesService(deps.Products, deps.Implementations, deps.Specs)
 	srv := &Server{
 		products:        deps.Products,
 		implementations: deps.Implementations,
 		featureContext:  fcSvc,
+		implFeatures:    ifSvc,
 	}
 	spec.RegisterHandlers(authd, srv)
 }
@@ -77,6 +79,7 @@ type Server struct {
 	products        *products.Repository
 	implementations *implementations.Repository
 	featureContext  *services.FeatureContextService
+	implFeatures    *services.ImplementationFeaturesService
 }
 
 // unimplementedServer satisfies spec.ServerInterface with 501 stubs.
@@ -93,11 +96,6 @@ func (unimplementedServer) AcaiWebApiFeatureContextControllerShow(_ echo.Context
 //nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface
 func (unimplementedServer) AcaiWebApiFeatureStatesControllerUpdate(_ echo.Context) error {
 	return echo.NewHTTPError(http.StatusNotImplemented, "feature-states not implemented yet (P2c)")
-}
-
-//nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface
-func (unimplementedServer) AcaiWebApiImplementationFeaturesControllerIndex(_ echo.Context, _ spec.AcaiWebApiImplementationFeaturesControllerIndexParams) error {
-	return echo.NewHTTPError(http.StatusNotImplemented, "implementation-features not implemented yet (P2b)")
 }
 
 //nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface

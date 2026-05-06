@@ -26,10 +26,13 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
 	ListBranchesForImplementation(ctx context.Context, implementationID string) ([]Branch, error)
+	ListFeatureBranchRefsForBranch(ctx context.Context, branchID string) ([]FeatureBranchRef, error)
+	ListFeatureImplStatesForImpl(ctx context.Context, implementationID string) ([]FeatureImplState, error)
 	ListImplementationsByBranch(ctx context.Context, arg ListImplementationsByBranchParams) ([]ListImplementationsByBranchRow, error)
 	ListImplementationsByProduct(ctx context.Context, arg ListImplementationsByProductParams) ([]ListImplementationsByProductRow, error)
 	ListImplementationsByProductAndBranch(ctx context.Context, arg ListImplementationsByProductAndBranchParams) ([]ListImplementationsByProductAndBranchRow, error)
 	ListImplementationsByTeam(ctx context.Context, teamID string) ([]ListImplementationsByTeamRow, error)
+	ListSpecsForBranch(ctx context.Context, branchID string) ([]Spec, error)
 	MarkUserConfirmed(ctx context.Context, arg MarkUserConfirmedParams) error
 	// Of the impl's tracked branches, return the branch with the most-recent
 	// feature_branch_refs.pushed_at for the given feature_name. Used as the
