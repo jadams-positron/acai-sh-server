@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
@@ -179,54 +180,105 @@ func (s *PushService) Execute(ctx context.Context, req PushRequest) (*PushResult
 
 	// --- 3. Process references ---
 	if req.References != nil {
-		if req.ProductName == nil {
-			return nil, fmt.Errorf("%w: product_name is required for references", ErrInvalidRequest)
-		}
-		if req.TargetImplName == nil {
-			return nil, fmt.Errorf("%w: target_impl_name is required for references", ErrInvalidRequest)
-		}
+		// Resolve the target impl using whichever info we have:
+		//   • If product_name AND target_impl_name are both set → explicit path
+		//     (with parent_impl_name auto-create).
+		//   • Otherwise → infer from tracked_branches for this branch.
+		var prod *products.Product
+		var impl *implementations.Implementation
 
-		prod, err := s.products.GetByTeamAndName(ctx, req.Team.ID, *req.ProductName)
-		if err != nil {
-			if products.IsNotFound(err) {
-				return nil, ErrProductNotFound
-			}
-			return nil, err
-		}
-
-		impl, err := s.impls.GetByProductAndName(ctx, prod.ID, *req.TargetImplName)
-		if err != nil {
-			if !implementations.IsNotFound(err) {
+		if req.ProductName != nil && req.TargetImplName != nil {
+			// Explicit path: caller supplied both product + target.
+			var err error
+			prod, err = s.products.GetByTeamAndName(ctx, req.Team.ID, *req.ProductName)
+			if err != nil {
+				if products.IsNotFound(err) {
+					return nil, ErrProductNotFound
+				}
 				return nil, err
 			}
-			// Implementation not found — try parent-based child creation.
-			if req.ParentImplName == nil {
-				return nil, fmt.Errorf("%w: implementation %q not found (and no parent_impl_name to create child from)", ErrInvalidRequest, *req.TargetImplName)
-			}
-			parent, perr := s.impls.GetByProductAndName(ctx, prod.ID, *req.ParentImplName)
-			if perr != nil {
-				if implementations.IsNotFound(perr) {
-					return nil, fmt.Errorf("%w: parent_impl_name %q not found", ErrInvalidRequest, *req.ParentImplName)
+
+			impl, err = s.impls.GetByProductAndName(ctx, prod.ID, *req.TargetImplName)
+			if err != nil {
+				if !implementations.IsNotFound(err) {
+					return nil, err
 				}
-				return nil, perr
+				// Implementation not found — try parent-based child creation.
+				if req.ParentImplName == nil {
+					return nil, fmt.Errorf("%w: implementation %q not found (and no parent_impl_name to create child from)", ErrInvalidRequest, *req.TargetImplName)
+				}
+				parent, perr := s.impls.GetByProductAndName(ctx, prod.ID, *req.ParentImplName)
+				if perr != nil {
+					if implementations.IsNotFound(perr) {
+						return nil, fmt.Errorf("%w: parent_impl_name %q not found", ErrInvalidRequest, *req.ParentImplName)
+					}
+					return nil, perr
+				}
+				// Create the child implementation.
+				impl, err = s.impls.Create(ctx, implementations.CreateImplementationParams{
+					ProductID:              prod.ID,
+					TeamID:                 req.Team.ID,
+					Name:                   *req.TargetImplName,
+					ParentImplementationID: &parent.ID,
+				})
+				if err != nil {
+					return nil, err
+				}
 			}
-			// Create the child implementation.
-			impl, err = s.impls.Create(ctx, implementations.CreateImplementationParams{
-				ProductID:              prod.ID,
-				TeamID:                 req.Team.ID,
-				Name:                   *req.TargetImplName,
-				ParentImplementationID: &parent.ID,
-			})
+		} else {
+			// Inference path: look up impls that track this branch.
+			tracked, err := s.impls.ListTrackingBranch(ctx, req.Team.ID, branch.ID)
 			if err != nil {
 				return nil, err
 			}
+			switch len(tracked) {
+			case 0:
+				// No impl tracks this branch — write refs but no impl linkage.
+				impl = nil
+				prod = nil
+			case 1:
+				impl = tracked[0]
+				p, err := s.products.GetByTeamAndName(ctx, req.Team.ID, impl.ProductName)
+				if err != nil {
+					return nil, err
+				}
+				prod = p
+			default:
+				// Multiple impls track this branch — caller must disambiguate.
+				if req.TargetImplName == nil {
+					names := make([]string, 0, len(tracked))
+					for _, t := range tracked {
+						names = append(names, t.Name)
+					}
+					return nil, fmt.Errorf("%w: branch is tracked by multiple implementations (%s); provide target_impl_name",
+						ErrInvalidRequest, strings.Join(names, ", "))
+				}
+				// Match by name among tracking impls.
+				for _, t := range tracked {
+					if t.Name == *req.TargetImplName {
+						impl = t
+						break
+					}
+				}
+				if impl == nil {
+					return nil, fmt.Errorf("%w: target_impl_name %q not found among tracking implementations",
+						ErrInvalidRequest, *req.TargetImplName)
+				}
+				p, err := s.products.GetByTeamAndName(ctx, req.Team.ID, impl.ProductName)
+				if err != nil {
+					return nil, err
+				}
+				prod = p
+			}
 		}
-		result.Product = prod
-		result.Implementation = impl
 
-		// Track branch ↔ impl.
-		if err := s.specs.UpsertTrackedBranch(ctx, impl.ID, branch.ID, req.RepoURI); err != nil {
-			return nil, err
+		if impl != nil {
+			result.Implementation = impl
+			result.Product = prod
+			// Track branch ↔ impl (idempotent).
+			if err := s.specs.UpsertTrackedBranch(ctx, impl.ID, branch.ID, req.RepoURI); err != nil {
+				return nil, err
+			}
 		}
 
 		// Group refs by feature name and upsert each feature row.

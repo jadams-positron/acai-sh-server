@@ -74,6 +74,16 @@ func newSmokeFixture(t *testing.T) *smokeFixture {
 	product := testfx.SeedProduct(t, app.DB, team, testfx.SeedProductOpts{Name: "smoke-product"})
 	impl := testfx.SeedImplementation(t, app.DB, product, testfx.SeedImplementationOpts{Name: "main"})
 
+	// Seed the branch the CLI will push to (repo=github.com/smoke/smoke-product,
+	// branch=main — matches the remote added by initGitRepo) and link impl → branch
+	// so that the inference path resolves to "main" when the CLI sends a refs-only
+	// push without product_name/target_impl_name.
+	branch := testfx.SeedBranch(t, app.DB, team, testfx.SeedBranchOpts{
+		RepoURI:    "github.com/smoke/smoke-product",
+		BranchName: "main",
+	})
+	testfx.SeedTrackedBranch(t, app.DB, impl, branch)
+
 	ts := httptest.NewServer(app.Echo)
 	t.Cleanup(ts.Close)
 
@@ -308,19 +318,12 @@ func TestCLISmoke_SetStatus(t *testing.T) {
 }
 
 // TestCLISmoke_PushNewSpec initializes a real git repo with a spec YAML, runs
-// `acai push`, and verifies behavior against our server.
+// `acai push`, and verifies the server accepts the refs-only push via inference.
 //
-// CONTRACT MISMATCH DOCUMENTED: the CLI sends a refs-only POST /api/v1/push
-// payload (no `product_name`, no `target_impl_name`) even when a spec file is
-// present. Our server correctly rejects refs-only pushes that omit product_name
-// (per the OpenAPI spec: "For refs-only pushes, product_name + target_impl_name
-// must resolve to an existing implementation"). The Phoenix server may have
-// different semantics here. This test verifies the server is reachable and
-// returns an appropriate error shape rather than crashing — this is the
-// expected behavior given the current contract gap.
-//
-// The specific failure signature is: exit=1, stdout contains
-// "failures":[{"productName":"unknown-product",...}].
+// The CLI sends a refs-only POST /api/v1/push payload (no `product_name`, no
+// `target_impl_name`). The server now infers the target impl from tracked_branches.
+// newSmokeFixture pre-seeds the branch+tracked_branches link so inference resolves
+// to the "main" impl, making the push succeed.
 func TestCLISmoke_PushNewSpec(t *testing.T) {
 	binary := findCLIBinary(t)
 	fx := newSmokeFixture(t)
@@ -362,14 +365,14 @@ requirements:
 		t.Fatalf("CLI could not reach server: stderr=%s stdout=%s", stderr, stdout)
 	}
 
-	// CONTRACT MISMATCH: The CLI sends refs-only without product_name or
-	// target_impl_name, which our server rejects with 422 "product_name is
-	// required for references". The CLI exits non-zero with a failures array.
-	//
-	// This is a known contract gap documented above.
 	t.Logf("acai push exit=%d stdout=%s stderr=%s", code, stdout, stderr)
 
-	// Verify the response is valid JSON (not a crash or empty output).
+	// The server now infers the impl from tracked_branches; push should succeed.
+	if code != 0 {
+		t.Fatalf("acai push exit=%d (want 0); stdout=%s stderr=%s", code, stdout, stderr)
+	}
+
+	// Response must be parseable JSON.
 	if strings.TrimSpace(stdout) != "" {
 		var pushOut map[string]any
 		if err := json.Unmarshal([]byte(stdout), &pushOut); err != nil {

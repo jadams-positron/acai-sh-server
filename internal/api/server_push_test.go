@@ -471,15 +471,19 @@ func TestPush_TooManySpecs_413(t *testing.T) {
 	resp.AssertStatus(http.StatusRequestEntityTooLarge)
 }
 
-func TestPush_RefsWithoutProductName_422(t *testing.T) {
+// TestPush_RefsWithoutProductName_InfersFromTracked verifies that a refs push
+// with target_impl_name but no product_name uses the inference path. When the
+// branch is not yet in tracked_branches (0 tracking impls), the server returns
+// 200 with no implementation_id/product_name (no-impl linkage case).
+func TestPush_RefsWithoutProductName_InfersFromTracked(t *testing.T) {
 	fx := setupPush(t)
 
 	body := pushBody{
-		BranchName:     "main",
+		BranchName:     "untracked-branch",
 		CommitHash:     "abc1234",
 		RepoURI:        "github.com/test/repo",
 		TargetImplName: new("production"),
-		// ProductName intentionally absent.
+		// ProductName intentionally absent — triggers inference path.
 		References: &refsPayload{
 			Data: map[string][]codeRefPayload{
 				"auth-feature.AUTH.1": {{Path: "lib/auth.go:1"}},
@@ -487,8 +491,24 @@ func TestPush_RefsWithoutProductName_422(t *testing.T) {
 		},
 	}
 
+	// 0 impls track this branch → inference yields no impl linkage → 200.
 	resp := fx.app.Client().WithBearer(fx.plaintext).POSTJSON("/api/v1/push", body)
-	resp.AssertStatus(http.StatusUnprocessableEntity)
+	resp.AssertStatus(http.StatusOK)
+
+	var doc pushResp
+	resp.JSON(&doc)
+	if doc.Data.ImplementationID != nil {
+		t.Errorf("implementation_id = %v, want nil (no tracking impl)", doc.Data.ImplementationID)
+	}
+	if doc.Data.ProductName != nil {
+		t.Errorf("product_name = %v, want nil (no tracking impl)", doc.Data.ProductName)
+	}
+	// Refs should still be written under the branch.
+	branchID := readBranchID(t, fx.app.DB, fx.team.ID, "github.com/test/repo", "untracked-branch")
+	refs := readFeatureRefs(t, fx.app.DB, branchID, "auth-feature")
+	if len(refs) == 0 {
+		t.Error("feature_branch_refs should be written even without impl linkage")
+	}
 }
 
 func TestPush_NoBearer_401(t *testing.T) {
