@@ -275,6 +275,67 @@ a:hover {
     overflow-y: auto;
 }
 
+/* === Collapsible description (native <details>) === */
+.desc-plain {
+    max-width: 80ch;
+}
+
+.desc-collapse {
+    max-width: 80ch;
+}
+
+.desc-collapse-summary {
+    cursor: pointer;
+    list-style: none;
+    position: relative;
+    padding-right: 28px;
+    border-radius: var(--radius-md);
+    transition: 0.2s ease;
+}
+
+.desc-collapse-summary::-webkit-details-marker {
+    display: none;
+}
+
+.desc-collapse-summary::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 4px;
+    width: 10px;
+    height: 10px;
+    border-right: 1.5px solid var(--muted);
+    border-bottom: 1.5px solid var(--muted);
+    transform: rotate(45deg);
+    transition:
+        transform 0.2s ease,
+        border-color 0.2s ease;
+}
+
+.desc-collapse-summary:hover::after {
+    border-right-color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+
+.desc-collapse[open] .desc-collapse-summary::after {
+    transform: rotate(-135deg);
+    top: 9px;
+}
+
+.desc-collapse-text {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    margin: 0;
+}
+
+.desc-collapse[open] .desc-collapse-text {
+    display: block;
+    overflow: visible;
+}
+
 /* === Breadcrumbs === */
 .breadcrumbs {
     display: flex;
