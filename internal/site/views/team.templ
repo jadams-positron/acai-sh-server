@@ -134,11 +134,11 @@ templ TeamShow(p TeamShowProps) {
 }
 
 templ teamOverviewBanner(h *services.TeamHeatmap) {
-	<section class="panel">
-		<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-md); gap: var(--space-md); flex-wrap: wrap;">
+	<section class="panel" style="padding: var(--space-md) var(--space-lg);">
+		<div style="display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); flex-wrap: wrap;">
 			<div>
-				<h2 style="font-size: var(--text-xl); margin: 0;">Progress</h2>
-				<p class="subtitle" style="margin: var(--space-xs) 0 0;">
+				<p class="subtitle" style="margin: 0; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.18em;">Progress</p>
+				<p class="subtitle" style="margin: 2px 0 0;">
 					{ pluralize(len(h.Rows), "product") }
 					{ " · " }
 					{ pluralize(h.ImplCount, "implementation") }
@@ -148,21 +148,26 @@ templ teamOverviewBanner(h *services.TeamHeatmap) {
 					{ fmt.Sprintf("%d acceptance criteria", h.AggregateTotal) }
 				</p>
 			</div>
-			<div style="text-align: right; font-size: var(--text-2xl); font-weight: 600;">
-				{ fmt.Sprintf("%d%%", percentInt(h.AggregateCounts.Completed+h.AggregateCounts.Accepted, h.AggregateTotal)) }
-				<div class="subtitle" style="font-size: var(--text-sm); font-weight: 400; margin-top: 2px;">complete</div>
+			<div style="display: flex; align-items: baseline; gap: var(--space-xs);">
+				<span style="font-size: var(--text-xl); font-weight: 600; font-family: var(--font-mono);">
+					{ fmt.Sprintf("%d%%", percentInt(h.AggregateCounts.Completed+h.AggregateCounts.Accepted, h.AggregateTotal)) }
+				</span>
+				<span class="subtitle" style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.12em;">complete</span>
 			</div>
 		</div>
-		@progressBar(h.AggregateCounts, h.AggregateTotal)
-		<div style="margin-top: var(--space-md);">
+		<div class="progress-quiet" style="margin-top: var(--space-md);">
+			@progressBar(h.AggregateCounts, h.AggregateTotal)
+		</div>
+		<div style="margin-top: var(--space-sm);">
 			@statusLegend(h.AggregateCounts)
 		</div>
 	</section>
 }
 
-// teamHeatmap renders the products × features matrix. Rows are products,
-// columns are features (rotated 45° headers), cells are colored by their
-// completion ratio with a red overlay when blocked.
+// teamHeatmap renders the products × features matrix. Rows are products
+// that have at least one feature with specs (others fold into a footer);
+// columns are features (rotated -45° headers anchored to column-left); cells
+// are colored by completion ratio with a red ring overlay when blocked.
 templ teamHeatmap(teamName string, h *services.TeamHeatmap) {
 	<section>
 		<h2 style="font-size: var(--text-2xl); margin: 0 0 var(--space-md);">Coverage</h2>
@@ -177,23 +182,26 @@ templ teamHeatmap(teamName string, h *services.TeamHeatmap) {
 							<th class="heatmap-corner"></th>
 							for _, name := range h.FeatureNames {
 								<th class="heatmap-th-feature" scope="col">
-									<a href={ templ.SafeURL("/t/" + teamName + "/f/" + name) }>
-										<span>{ name }</span>
-									</a>
+									<a href={ templ.SafeURL("/t/" + teamName + "/f/" + name) }>{ name }</a>
 								</th>
 							}
-							<th class="heatmap-th-rowtotal" scope="col">
-								<span>Total</span>
-							</th>
+							<th class="heatmap-corner"></th>
 						</tr>
 					</thead>
 					<tbody>
 						for _, row := range h.Rows {
-							@teamHeatmapRow(teamName, row)
+							if row.ProductPresent {
+								@teamHeatmapRow(teamName, row)
+							}
 						}
 					</tbody>
 				</table>
 			</div>
+			if hiddenEmptyCount(h) > 0 {
+				<p class="subtitle" style="margin: var(--space-sm) 0 0; font-size: var(--text-xs);">
+					{ fmt.Sprintf("+ %s without specs yet — push from a tracked branch to add them to the matrix", pluralize(hiddenEmptyCount(h), "product")) }
+				</p>
+			}
 			<div class="heatmap-legend">
 				<span class="heatmap-legend-label">none</span>
 				<span class="heatmap-legend-swatch" data-fill="0"></span>
@@ -222,18 +230,27 @@ templ teamHeatmapRow(teamName string, row *services.HeatmapRow) {
 			@teamHeatmapCell(teamName, cell)
 		}
 		<td class="heatmap-cell-total">
-			if row.ProductPresent && row.ProductTotal > 0 {
-				<div class="heatmap-cell-total-pct">
-					{ fmt.Sprintf("%d%%", percentInt(row.ProductCounts.Completed+row.ProductCounts.Accepted, row.ProductTotal)) }
-				</div>
-				<div class="heatmap-cell-total-meta">
-					{ fmt.Sprintf("%d ACIDs", row.ProductTotal) }
-				</div>
-			} else {
-				<div class="heatmap-cell-total-pct subtitle">—</div>
-			}
+			<div class="heatmap-cell-total-pct">
+				{ fmt.Sprintf("%d%%", percentInt(row.ProductCounts.Completed+row.ProductCounts.Accepted, row.ProductTotal)) }
+			</div>
+			<div class="heatmap-cell-total-meta">
+				{ fmt.Sprintf("%d ACIDs", row.ProductTotal) }
+			</div>
 		</td>
 	</tr>
+}
+
+// hiddenEmptyCount returns the number of products in the matrix that
+// have no specs yet — they're filtered out of the rendered grid but
+// surfaced in a small footnote so the user knows they exist.
+func hiddenEmptyCount(h *services.TeamHeatmap) int {
+	n := 0
+	for _, row := range h.Rows {
+		if !row.ProductPresent {
+			n++
+		}
+	}
+	return n
 }
 
 templ teamHeatmapCell(teamName string, cell *services.HeatmapCell) {

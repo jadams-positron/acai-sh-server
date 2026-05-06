@@ -92,11 +92,11 @@ func TestTeamShow_RendersHeatmapAndBanner(t *testing.T) {
 	body := string(resp.Body())
 	for _, want := range []string{
 		// Aggregate banner.
-		`>Progress<`,
+		`>Progress</p>`,
 		`2 products`,
 		`2 implementations`,
 		`2 features`,
-		`>complete</div>`,
+		`>complete</span>`,
 		// Heatmap structure.
 		`<table class="heatmap"`,
 		`>Coverage<`,

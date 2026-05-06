@@ -341,15 +341,23 @@ a:hover {
     padding: var(--space-md) var(--space-md) var(--space-lg);
 }
 
+/* Wrapper handles horizontal overflow; its contents shrink-to-fit so the
+   matrix reads as a compact island instead of stretching to panel width. */
 .heatmap-scroll {
     overflow-x: auto;
     padding-bottom: var(--space-sm);
+    text-align: left;
 }
 
 .heatmap {
+    /* Force fixed layout so .heatmap-cell { width: 32px } is honored as a
+       hard column width, not a min hint that the browser may stretch. */
+    table-layout: fixed;
     border-collapse: separate;
     border-spacing: 4px;
-    margin: 0 auto;
+    /* width:auto + display:inline-table = matrix shrinks to its content. */
+    width: auto;
+    display: inline-table;
 }
 
 /* Empty top-left corner cell. */
@@ -359,37 +367,37 @@ a:hover {
     background: transparent;
 }
 
-/* Rotated feature column header — reads bottom-up at ~60° so long names
-   stay legible at typical product counts. */
+/* Rotated feature column header. -45° + transform-origin: left bottom
+   anchors the rotated label to the column's left edge so the eye can
+   trace label → cell. Sans (not mono) for legibility at small sizes. */
 .heatmap-th-feature {
-    height: 140px;
-    width: 28px;
-    padding: 0 0 var(--space-sm);
+    height: 110px;
+    width: 32px;
+    padding: 0;
     vertical-align: bottom;
     font-weight: 500;
-    font-size: var(--text-sm);
     color: var(--muted);
 }
 
 .heatmap-th-feature a {
     display: inline-block;
-    transform: rotate(-60deg);
-    transform-origin: 50% 100%;
+    transform: rotate(-45deg);
+    transform-origin: left bottom;
     white-space: nowrap;
     text-decoration: none;
     color: inherit;
-    padding-left: 8px;
+    /* Anchor the rotated label to the column's left edge, just above the
+       cell, so it reads as belonging to the column below it. */
+    position: relative;
+    left: 8px;
+    bottom: 4px;
+    font-family: var(--font-sans);
+    font-size: var(--text-xs);
 }
 
 .heatmap-th-feature a:hover {
     color: var(--accent);
     text-decoration: none;
-}
-
-.heatmap-th-feature span {
-    display: inline-block;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
 }
 
 /* Product row label on the left. */
@@ -411,22 +419,10 @@ a:hover {
     color: var(--accent);
 }
 
-.heatmap-th-rowtotal {
-    width: 80px;
-    text-align: center;
-    padding: 0 0 var(--space-sm);
-    vertical-align: bottom;
-    font-weight: 500;
-    font-size: var(--text-sm);
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-}
-
-/* The cells themselves. */
+/* The cells themselves — square, fixed via table-layout. */
 .heatmap-cell {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
     padding: 0;
     border-radius: 4px;
     border: 1px solid var(--border-subtle);
@@ -469,11 +465,15 @@ a:hover {
     text-decoration: none;
 }
 
-/* Per-row completion totals on the right edge. */
+/* Per-row completion total — inline at the end of the row, left-aligned
+   with a soft left divider so it reads as a coda to the cells. */
 .heatmap-cell-total {
-    padding: 0 var(--space-sm);
-    text-align: center;
+    padding: 0 var(--space-md);
+    text-align: left;
     color: var(--muted);
+    border-left: 1px solid var(--border-subtle);
+    white-space: nowrap;
+    width: 1%;
 }
 
 .heatmap-cell-total-pct {
@@ -763,6 +763,15 @@ code {
     background: rgba(var(--color-accent-rgb), 0.08);
     padding: 1px 4px;
     border-radius: var(--radius-sm);
+}
+
+/* === Progress bar (used in banners + per-row) === */
+/* The "quiet" variant trims the bar height and softens the green so the
+   banner doesn't visually outshout the matrix beneath it. Applied via a
+   wrapper class so callers can opt in. */
+.progress-quiet > div {
+    height: 5px !important;
+    opacity: 0.85;
 }
 
 /* === Empty state === */
