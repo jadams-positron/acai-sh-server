@@ -35,6 +35,7 @@ func TestShell_TopbarShowsUserChipAndTeamSwitcher(t *testing.T) {
 
 	for _, want := range []string{
 		`<title>Page — Acai</title>`,
+		`<link rel="icon" type="image/svg+xml" href="/_assets/icons/positron.svg">`,
 		`user@example.com`,
 		`<form method="post" action="/users/log-out">`,
 		`name="gorilla.csrf.Token" value="csrf-token-abc"`,

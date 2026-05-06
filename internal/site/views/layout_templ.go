@@ -45,7 +45,7 @@ func Layout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " — Acai</title><link rel=\"stylesheet\" href=\"/_assets/css/app.css\"><script type=\"module\" src=\"/_assets/js/datastar.min.js\"></script></head><body><div class=\"app\"><header class=\"topbar\"><div class=\"brand\"><span class=\"brand-dot\"></span> <span class=\"brand-name\">acai</span></div></header><main class=\"main\"><div class=\"main-narrow\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " — Acai</title><link rel=\"icon\" type=\"image/svg+xml\" href=\"/_assets/icons/positron.svg\"><link rel=\"stylesheet\" href=\"/_assets/css/app.css\"><script type=\"module\" src=\"/_assets/js/datastar.min.js\"></script></head><body><div class=\"app\"><header class=\"topbar\"><div class=\"brand\"><span class=\"brand-dot\"></span> <span class=\"brand-name\">acai</span></div></header><main class=\"main\"><div class=\"main-narrow\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
