@@ -120,6 +120,19 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		FeatureView: featureViewSvc,
 	}
 	site.MountImplFeatureShowRoutes(browser, implFeatureShowDeps, csrfMW)
+	implsIndexDeps := &handlers.ImplsIndexDeps{
+		Logger:          logger,
+		Teams:           deps.Teams,
+		Implementations: deps.Implementations,
+	}
+	site.MountImplsIndexRoutes(browser, implsIndexDeps, csrfMW)
+	implShowDeps := &handlers.ImplShowDeps{
+		Logger:          logger,
+		Teams:           deps.Teams,
+		Implementations: deps.Implementations,
+		Specs:           deps.Specs,
+	}
+	site.MountImplShowRoutes(browser, implShowDeps, csrfMW)
 	teamSettingsDeps := &handlers.TeamSettingsDeps{
 		Logger:   logger,
 		Teams:    deps.Teams,

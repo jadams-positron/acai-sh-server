@@ -105,6 +105,7 @@ templ sidebarNav(activeTeam *teams.Team, activeSection string) {
 		} else {
 			<div class="sidebar-section-label">{ activeTeam.Name }</div>
 			@navItem("/t/"+activeTeam.Name, "Overview", activeSection == "overview")
+			@navItem("/t/"+activeTeam.Name+"/implementations", "Implementations", activeSection == "implementations")
 			@navItem("/t/"+activeTeam.Name+"/settings", "Settings", activeSection == "settings")
 			@navItem("/t/"+activeTeam.Name+"/tokens", "Tokens", activeSection == "tokens")
 			<div style="height: 1px; background: var(--border-subtle); margin: var(--space-sm) 0;"></div>
