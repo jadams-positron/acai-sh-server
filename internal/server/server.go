@@ -87,7 +87,11 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 	// Browser group: load scope, then individual route groups apply csrf as needed.
 	browser := e.Group("", auth.LoadScope(deps.Sessions, deps.Accounts))
 	site.MountAuthRoutes(browser, deps.AuthHandlerDeps, csrfMW)
-	site.MountAuthRequiredStub(browser, csrfMW)
+	teamsHandlerDeps := &handlers.TeamsDeps{
+		Logger: logger,
+		Teams:  deps.Teams,
+	}
+	site.MountTeamsRoutes(browser, teamsHandlerDeps, csrfMW)
 
 	// Static assets — public, no session.
 	handlers.MountStatic(e.Group(""))

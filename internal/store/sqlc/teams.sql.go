@@ -42,6 +42,30 @@ func (q *Queries) CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, e
 	return i, err
 }
 
+const createUserTeamRole = `-- name: CreateUserTeamRole :exec
+INSERT INTO user_team_roles (team_id, user_id, title, inserted_at, updated_at)
+VALUES (?, ?, ?, ?, ?)
+`
+
+type CreateUserTeamRoleParams struct {
+	TeamID     string
+	UserID     string
+	Title      string
+	InsertedAt string
+	UpdatedAt  string
+}
+
+func (q *Queries) CreateUserTeamRole(ctx context.Context, arg CreateUserTeamRoleParams) error {
+	_, err := q.db.ExecContext(ctx, createUserTeamRole,
+		arg.TeamID,
+		arg.UserID,
+		arg.Title,
+		arg.InsertedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
 const getTeamByID = `-- name: GetTeamByID :one
 SELECT id, name, global_admin, inserted_at, updated_at
 FROM teams
@@ -60,4 +84,41 @@ func (q *Queries) GetTeamByID(ctx context.Context, id string) (Team, error) {
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listTeamsForUser = `-- name: ListTeamsForUser :many
+SELECT t.id, t.name, t.global_admin, t.inserted_at, t.updated_at
+FROM teams t
+JOIN user_team_roles utr ON utr.team_id = t.id
+WHERE utr.user_id = ?
+ORDER BY t.name
+`
+
+func (q *Queries) ListTeamsForUser(ctx context.Context, userID string) ([]Team, error) {
+	rows, err := q.db.QueryContext(ctx, listTeamsForUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Team{}
+	for rows.Next() {
+		var i Team
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.GlobalAdmin,
+			&i.InsertedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

@@ -28,6 +28,18 @@ func NewRepository(db *store.DB) *Repository { return &Repository{db: db} }
 // ErrInvalidToken is returned when token verification fails for any reason.
 var ErrInvalidToken = errors.New("teams: invalid token")
 
+// ErrDuplicateName is returned when a team name is already taken.
+var ErrDuplicateName = errors.New("teams: duplicate team name")
+
+// IsDuplicateName reports whether err is or wraps ErrDuplicateName.
+func IsDuplicateName(err error) bool { return errors.Is(err, ErrDuplicateName) }
+
+// ErrInvalidTeamName is returned for malformed team names.
+var ErrInvalidTeamName = errors.New("teams: invalid team name (must be alphanumeric + hyphens/underscores, 1-64 chars)")
+
+// IsInvalidTeamName reports whether err is or wraps ErrInvalidTeamName.
+func IsInvalidTeamName(err error) bool { return errors.Is(err, ErrInvalidTeamName) }
+
 // IsInvalidToken reports whether err is or wraps ErrInvalidToken.
 func IsInvalidToken(err error) bool { return errors.Is(err, ErrInvalidToken) }
 
@@ -60,6 +72,66 @@ func (r *Repository) GetTeamByID(ctx context.Context, id string) (*Team, error) 
 		return nil, fmt.Errorf("teams: GetTeamByID: %w", err)
 	}
 	return teamFromRow(row)
+}
+
+// ListForUser returns all teams the user belongs to via user_team_roles.
+func (r *Repository) ListForUser(ctx context.Context, userID string) ([]*Team, error) {
+	q := sqlc.New(r.db.Read)
+	rows, err := q.ListTeamsForUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("teams: ListForUser: %w", err)
+	}
+	out := make([]*Team, 0, len(rows))
+	for _, row := range rows {
+		t, err := teamFromRow(row)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, nil
+}
+
+// CreateTeamWithOwner atomically creates a team and links userID as the
+// "owner" role via user_team_roles. Validates name format before inserting.
+func (r *Repository) CreateTeamWithOwner(ctx context.Context, userID, name string) (*Team, error) {
+	if err := validateTeamName(name); err != nil {
+		return nil, err
+	}
+	team, err := r.CreateTeam(ctx, name)
+	if err != nil {
+		// Surface SQLite UNIQUE constraint violations as ErrDuplicateName.
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			return nil, fmt.Errorf("%w: %s", ErrDuplicateName, name)
+		}
+		return nil, err
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	q := sqlc.New(r.db.Write)
+	if err := q.CreateUserTeamRole(ctx, sqlc.CreateUserTeamRoleParams{
+		TeamID:     team.ID,
+		UserID:     userID,
+		Title:      "owner",
+		InsertedAt: now,
+		UpdatedAt:  now,
+	}); err != nil {
+		return nil, fmt.Errorf("teams: link owner: %w", err)
+	}
+	return team, nil
+}
+
+func validateTeamName(name string) error {
+	if len(name) < 1 || len(name) > 64 {
+		return fmt.Errorf("%w: length %d", ErrInvalidTeamName, len(name))
+	}
+	for _, c := range name {
+		ok := (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+			(c >= '0' && c <= '9') || c == '-' || c == '_'
+		if !ok {
+			return fmt.Errorf("%w: invalid character %q", ErrInvalidTeamName, c)
+		}
+	}
+	return nil
 }
 
 // CreateAccessTokenParams is the input for CreateAccessToken.

@@ -16,6 +16,7 @@ type Querier interface {
 	CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error)
 	CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	CreateUserTeamRole(ctx context.Context, arg CreateUserTeamRoleParams) error
 	DeleteEmailToken(ctx context.Context, id string) error
 	DeleteEmailTokensForUser(ctx context.Context, arg DeleteEmailTokensForUserParams) error
 	GetAccessTokenByPrefix(ctx context.Context, tokenPrefix string) (AccessToken, error)
@@ -38,6 +39,7 @@ type Querier interface {
 	ListImplementationsByTeam(ctx context.Context, teamID string) ([]ListImplementationsByTeamRow, error)
 	ListImplementationsTrackingBranch(ctx context.Context, arg ListImplementationsTrackingBranchParams) ([]ListImplementationsTrackingBranchRow, error)
 	ListSpecsForBranch(ctx context.Context, branchID string) ([]Spec, error)
+	ListTeamsForUser(ctx context.Context, userID string) ([]Team, error)
 	MarkUserConfirmed(ctx context.Context, arg MarkUserConfirmedParams) error
 	// Of the impl's tracked branches, return the branch with the most-recent
 	// feature_branch_refs.pushed_at for the given feature_name. Used as the

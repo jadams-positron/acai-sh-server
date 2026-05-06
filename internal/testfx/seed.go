@@ -292,6 +292,20 @@ func SeedFeatureBranchRef(t *testing.T, db *store.DB, branch *SeededBranch, feat
 	}
 }
 
+// SeedUserTeamRole links user to team with the given title (e.g. "owner").
+func SeedUserTeamRole(t *testing.T, db *store.DB, user *accounts.User, team *teams.Team, title string) {
+	t.Helper()
+	if title == "" {
+		title = "member"
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := db.Write.ExecContext(context.Background(),
+		`INSERT INTO user_team_roles (team_id, user_id, title, inserted_at, updated_at) VALUES (?, ?, ?, ?, ?)`,
+		team.ID, user.ID, title, now, now); err != nil {
+		t.Fatalf("testfx.SeedUserTeamRole: %v", err)
+	}
+}
+
 // shortID returns a short URL-safe random ID used for default names.
 func shortID() string {
 	id, _ := uuid.NewV7()

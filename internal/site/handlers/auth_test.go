@@ -15,6 +15,7 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/config"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/mail"
 	"github.com/jadams-positron/acai-sh-server/internal/ops"
 	"github.com/jadams-positron/acai-sh-server/internal/server"
@@ -73,10 +74,12 @@ func TestLogin_FullMagicLinkFlow(t *testing.T) {
 		FromName:  cfg.MailFromName,
 	}
 
+	teamsRepo := teams.NewRepository(db)
 	srv, err := server.New(cfg, logger, &server.RouterDeps{
 		DB:              db,
 		Sessions:        sessionStore,
 		Accounts:        repo,
+		Teams:           teamsRepo,
 		AuthHandlerDeps: authDeps,
 		SecureCookie:    false,
 		Version:         "test",
@@ -156,8 +159,9 @@ func TestLogin_FullMagicLinkFlow(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("/teams status = %d, want %d; body=%s", resp.StatusCode, http.StatusOK, tbody)
 	}
-	if !strings.Contains(string(tbody), "alice@example.com") {
-		t.Errorf("/teams body did not contain user email; body=%s", tbody)
+	// The real /teams page shows "No teams yet" (or team list) — just check it loads.
+	if !strings.Contains(string(tbody), "Teams") {
+		t.Errorf("/teams body did not contain Teams heading; body=%s", tbody)
 	}
 }
 
@@ -198,10 +202,12 @@ func TestRegister_FullFlowMarksUserConfirmed(t *testing.T) {
 		FromName:  cfg.MailFromName,
 	}
 
+	teamsRepo2 := teams.NewRepository(db)
 	srv, err := server.New(cfg, logger, &server.RouterDeps{
 		DB:              db,
 		Sessions:        sessionStore,
 		Accounts:        repo,
+		Teams:           teamsRepo2,
 		AuthHandlerDeps: authDeps,
 		SecureCookie:    false,
 		Version:         "test",
@@ -298,8 +304,9 @@ func TestRegister_FullFlowMarksUserConfirmed(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("/teams status = %d, want %d; body=%s", resp.StatusCode, http.StatusOK, tbody)
 	}
-	if !strings.Contains(string(tbody), "newcomer@example.com") {
-		t.Errorf("/teams body did not contain user email; body=%s", tbody)
+	// The real /teams page shows "No teams yet" (or team list) — just check it loads.
+	if !strings.Contains(string(tbody), "Teams") {
+		t.Errorf("/teams body did not contain Teams heading; body=%s", tbody)
 	}
 }
 
