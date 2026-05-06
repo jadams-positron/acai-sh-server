@@ -8,6 +8,7 @@ import (
 
 // ProductShowProps drives the /t/{team_name}/p/{product_name} page.
 type ProductShowProps struct {
+	Shell           ShellProps
 	Team            *teams.Team
 	Product         *products.Product
 	Implementations []*implementations.Implementation
@@ -15,15 +16,8 @@ type ProductShowProps struct {
 }
 
 templ ProductShow(p ProductShowProps) {
-	@Layout(p.Product.Name + " · " + p.Team.Name) {
+	@Shell(p.Shell) {
 		<header class="page-header">
-			<p class="subtitle">
-				<a href="/teams">Teams</a>
-				{ " / " }
-				<a href={ templ.SafeURL("/t/" + p.Team.Name) }>{ p.Team.Name }</a>
-				{ " / " }
-				<span>{ p.Product.Name }</span>
-			</p>
 			<h1 class="title">{ p.Product.Name }</h1>
 			if p.Product.Description != nil && *p.Product.Description != "" {
 				<p class="subtitle">{ *p.Product.Description }</p>

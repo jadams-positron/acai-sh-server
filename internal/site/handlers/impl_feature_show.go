@@ -62,8 +62,20 @@ func ImplFeatureShow(d *ImplFeatureShowDeps) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed")
 		}
 
+		shell, err := buildShellChrome(c, d.Teams, featureName+" · "+view.Implementation.Name, team, "overview", []views.Crumb{
+			{Label: "Teams", HRef: "/teams"},
+			{Label: team.Name, HRef: "/t/" + team.Name},
+			{Label: view.Implementation.ProductName, HRef: "/t/" + team.Name + "/p/" + view.Implementation.ProductName},
+			{Label: featureName, HRef: "/t/" + team.Name + "/f/" + featureName},
+			{Label: view.Implementation.Name},
+		})
+		if err != nil {
+			d.Logger.Error("impl feature show: shell chrome", "error", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed")
+		}
 		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 		return views.ImplFeature(views.ImplFeatureProps{
+			Shell:          shell,
 			Team:           team,
 			Implementation: view.Implementation,
 			ImplSlug:       implSlug,

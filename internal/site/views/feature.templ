@@ -9,6 +9,7 @@ import (
 
 // FeatureShowProps drives the /t/{team}/f/{feature} page.
 type FeatureShowProps struct {
+	Shell              ShellProps
 	Team               *teams.Team
 	FeatureName        string
 	FeatureDescription string
@@ -16,15 +17,8 @@ type FeatureShowProps struct {
 }
 
 templ FeatureShow(p FeatureShowProps) {
-	@Layout(p.FeatureName + " · " + p.Team.Name) {
+	@Shell(p.Shell) {
 		<header class="page-header">
-			<p class="subtitle">
-				<a href="/teams">Teams</a>
-				{ " / " }
-				<a href={ templ.SafeURL("/t/" + p.Team.Name) }>{ p.Team.Name }</a>
-				{ " / " }
-				<span>{ p.FeatureName }</span>
-			</p>
 			<h1 class="title">{ p.FeatureName }</h1>
 			if p.FeatureDescription != "" {
 				<p class="subtitle">{ p.FeatureDescription }</p>

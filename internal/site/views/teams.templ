@@ -4,6 +4,7 @@ import "github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 
 // TeamsIndexProps drives the /teams page.
 type TeamsIndexProps struct {
+	Shell         ShellProps
 	Teams         []*teams.Team
 	CSRFToken     string
 	Flash         string // optional error message from a previous create attempt
@@ -11,7 +12,7 @@ type TeamsIndexProps struct {
 }
 
 templ TeamsIndex(p TeamsIndexProps) {
-	@Layout("Teams") {
+	@Shell(p.Shell) {
 		<header class="page-header">
 			<h1 class="title">Teams</h1>
 			<p class="subtitle">Manage your teams and create new ones.</p>

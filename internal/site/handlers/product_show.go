@@ -65,8 +65,18 @@ func ProductShow(d *ProductShowDeps) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load features")
 		}
 
+		shell, err := buildShellChrome(c, d.Teams, prod.Name+" · "+team.Name, team, "overview", []views.Crumb{
+			{Label: "Teams", HRef: "/teams"},
+			{Label: team.Name, HRef: "/t/" + team.Name},
+			{Label: prod.Name},
+		})
+		if err != nil {
+			d.Logger.Error("product show: shell chrome", "error", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load product")
+		}
 		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 		return views.ProductShow(views.ProductShowProps{
+			Shell:           shell,
 			Team:            team,
 			Product:         prod,
 			Implementations: impls,

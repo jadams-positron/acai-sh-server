@@ -10,6 +10,7 @@ import (
 
 // ImplFeatureProps drives the /t/{team}/i/{impl_slug}/f/{feature} page.
 type ImplFeatureProps struct {
+	Shell          ShellProps
 	Team           *teams.Team
 	Implementation *implementations.Implementation
 	ImplSlug       string
@@ -19,19 +20,8 @@ type ImplFeatureProps struct {
 }
 
 templ ImplFeature(p ImplFeatureProps) {
-	@Layout(p.FeatureName + " · " + p.Implementation.Name) {
+	@Shell(p.Shell) {
 		<header class="page-header">
-			<p class="subtitle">
-				<a href="/teams">Teams</a>
-				{ " / " }
-				<a href={ templ.SafeURL("/t/" + p.Team.Name) }>{ p.Team.Name }</a>
-				{ " / " }
-				<a href={ templ.SafeURL("/t/" + p.Team.Name + "/p/" + p.Implementation.ProductName) }>{ p.Implementation.ProductName }</a>
-				{ " / " }
-				<span>{ p.Implementation.Name }</span>
-				{ " / " }
-				<span>{ p.FeatureName }</span>
-			</p>
 			<h1 class="title">{ p.FeatureName }</h1>
 			<p class="subtitle">
 				Implementation: <strong>{ p.Implementation.Name }</strong>

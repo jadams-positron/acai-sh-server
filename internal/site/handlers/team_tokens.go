@@ -57,8 +57,18 @@ func renderTeamTokens(c echo.Context, d *TeamTokensDeps, team *teams.Team, flash
 		d.Logger.Error("team tokens: ListAccessTokensForTeam", "error", err)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load tokens")
 	}
+	shell, err := buildShellChrome(c, d.Teams, team.Name+" · Tokens", team, "tokens", []views.Crumb{
+		{Label: "Teams", HRef: "/teams"},
+		{Label: team.Name, HRef: "/t/" + team.Name},
+		{Label: "Tokens"},
+	})
+	if err != nil {
+		d.Logger.Error("team tokens: shell chrome", "error", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load tokens")
+	}
 	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 	return views.TeamTokens(views.TeamTokensProps{
+		Shell:             shell,
 		Team:              team,
 		Tokens:            toks,
 		CSRFToken:         csrfTokenFromEcho(c),

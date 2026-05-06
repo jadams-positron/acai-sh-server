@@ -8,6 +8,7 @@ import (
 
 // TeamSettingsProps drives the /t/{team_name}/settings page.
 type TeamSettingsProps struct {
+	Shell         ShellProps
 	Team          *teams.Team
 	Members       []*teams.Member
 	CSRFToken     string
@@ -18,12 +19,9 @@ type TeamSettingsProps struct {
 }
 
 templ TeamSettings(p TeamSettingsProps) {
-	@Layout(p.Team.Name + " · Settings") {
+	@Shell(p.Shell) {
 		<header class="page-header">
-			<h1 class="title">{ p.Team.Name } · Settings</h1>
-			<p class="subtitle">
-				<a href={ templ.SafeURL("/t/" + p.Team.Name) }>← { p.Team.Name }</a>
-			</p>
+			<h1 class="title">Settings</h1>
 		</header>
 		if p.Flash != "" {
 			if p.FlashType == "success" {

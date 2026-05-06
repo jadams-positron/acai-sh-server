@@ -63,8 +63,18 @@ func renderTeamSettings(c echo.Context, d *TeamSettingsDeps, team *teams.Team, r
 	if scope.User != nil {
 		currentUserID = scope.User.ID
 	}
+	shell, err := buildShellChrome(c, d.Teams, team.Name+" · Settings", team, "settings", []views.Crumb{
+		{Label: "Teams", HRef: "/teams"},
+		{Label: team.Name, HRef: "/t/" + team.Name},
+		{Label: "Settings"},
+	})
+	if err != nil {
+		d.Logger.Error("team settings: shell chrome", "error", err)
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to load settings")
+	}
 	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 	return views.TeamSettings(views.TeamSettingsProps{
+		Shell:         shell,
 		Team:          team,
 		Members:       members,
 		CSRFToken:     csrfTokenFromEcho(c),
