@@ -62,11 +62,14 @@ func Mount(parent *echo.Echo, deps *Deps) {
 
 	fcSvc := services.NewFeatureContextService(deps.Products, deps.Implementations, deps.Specs)
 	ifSvc := services.NewImplementationFeaturesService(deps.Products, deps.Implementations, deps.Specs)
+	fsSvc := services.NewFeatureStatesService(deps.Products, deps.Implementations, deps.Specs)
 	srv := &Server{
 		products:        deps.Products,
 		implementations: deps.Implementations,
 		featureContext:  fcSvc,
 		implFeatures:    ifSvc,
+		featureStates:   fsSvc,
+		operations:      deps.Operations,
 	}
 	spec.RegisterHandlers(authd, srv)
 }
@@ -80,6 +83,8 @@ type Server struct {
 	implementations *implementations.Repository
 	featureContext  *services.FeatureContextService
 	implFeatures    *services.ImplementationFeaturesService
+	featureStates   *services.FeatureStatesService
+	operations      *operations.Config
 }
 
 // unimplementedServer satisfies spec.ServerInterface with 501 stubs.
@@ -91,11 +96,6 @@ type unimplementedServer struct{}
 //nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface
 func (unimplementedServer) AcaiWebApiFeatureContextControllerShow(_ echo.Context, _ spec.AcaiWebApiFeatureContextControllerShowParams) error {
 	return echo.NewHTTPError(http.StatusNotImplemented, "feature-context not implemented yet (P2b)")
-}
-
-//nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface
-func (unimplementedServer) AcaiWebApiFeatureStatesControllerUpdate(_ echo.Context) error {
-	return echo.NewHTTPError(http.StatusNotImplemented, "feature-states not implemented yet (P2c)")
 }
 
 //nolint:revive,staticcheck // method name is dictated by oapi-codegen ServerInterface

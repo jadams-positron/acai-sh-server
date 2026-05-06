@@ -63,3 +63,12 @@ SELECT *
 FROM feature_branch_refs
 WHERE branch_id = ?
 ORDER BY feature_name;
+
+-- name: UpsertFeatureImplState :exec
+-- Upserts the row for (implementation_id, feature_name) with the given states JSON.
+-- Insert if missing, update otherwise.
+INSERT INTO feature_impl_states (id, implementation_id, feature_name, states, inserted_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT(implementation_id, feature_name) DO UPDATE
+SET states = excluded.states,
+    updated_at = excluded.updated_at;

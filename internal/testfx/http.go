@@ -79,6 +79,11 @@ func (c *Client) PATCHJSON(path string, body any) *Response {
 	return c.do(http.MethodPatch, path, nil, buf, "application/json")
 }
 
+// PATCHRaw issues a PATCH with a raw body and explicit content type.
+func (c *Client) PATCHRaw(path, contentType string, body io.Reader) *Response {
+	return c.do(http.MethodPatch, path, nil, body, contentType)
+}
+
 // POSTForm issues a POST with form-encoded body.
 func (c *Client) POSTForm(path string, form url.Values) *Response {
 	body := strings.NewReader(form.Encode())

@@ -321,3 +321,34 @@ func (q *Queries) PickRefsBranchForFeature(ctx context.Context, arg PickRefsBran
 	)
 	return i, err
 }
+
+const upsertFeatureImplState = `-- name: UpsertFeatureImplState :exec
+INSERT INTO feature_impl_states (id, implementation_id, feature_name, states, inserted_at, updated_at)
+VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT(implementation_id, feature_name) DO UPDATE
+SET states = excluded.states,
+    updated_at = excluded.updated_at
+`
+
+type UpsertFeatureImplStateParams struct {
+	ID               string
+	ImplementationID string
+	FeatureName      string
+	States           string
+	InsertedAt       string
+	UpdatedAt        string
+}
+
+// Upserts the row for (implementation_id, feature_name) with the given states JSON.
+// Insert if missing, update otherwise.
+func (q *Queries) UpsertFeatureImplState(ctx context.Context, arg UpsertFeatureImplStateParams) error {
+	_, err := q.db.ExecContext(ctx, upsertFeatureImplState,
+		arg.ID,
+		arg.ImplementationID,
+		arg.FeatureName,
+		arg.States,
+		arg.InsertedAt,
+		arg.UpdatedAt,
+	)
+	return err
+}

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/jadams-positron/acai-sh-server/internal/store"
 	"github.com/jadams-positron/acai-sh-server/internal/store/sqlc"
 )
@@ -156,6 +158,50 @@ func (r *Repository) ListRefsForBranch(ctx context.Context, branchID string) ([]
 		out = append(out, rf)
 	}
 	return out, nil
+}
+
+// UpsertStates writes the states JSON map for (implID, featureName), creating
+// the row if missing. Caller is responsible for the merge (this is a full
+// replace). If you need merge-with-existing, call GetStates first, mutate, pass
+// the resulting map.
+func (r *Repository) UpsertStates(ctx context.Context, implID, featureName string, states map[string]ACIDState) error {
+	type acidStateJSON struct {
+		Status    *string `json:"status"`
+		Comment   *string `json:"comment,omitempty"`
+		UpdatedAt *string `json:"updated_at,omitempty"`
+	}
+	out := make(map[string]acidStateJSON, len(states))
+	for k, v := range states {
+		entry := acidStateJSON{Status: v.Status, Comment: v.Comment}
+		if v.UpdatedAt != nil {
+			s := v.UpdatedAt.UTC().Format(time.RFC3339Nano)
+			entry.UpdatedAt = &s
+		}
+		out[k] = entry
+	}
+	raw, err := json.Marshal(out)
+	if err != nil {
+		return fmt.Errorf("specs: marshal states: %w", err)
+	}
+
+	id, err := uuid.NewV7()
+	if err != nil {
+		return fmt.Errorf("specs: gen uuid: %w", err)
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+
+	q := sqlc.New(r.db.Write)
+	if err := q.UpsertFeatureImplState(ctx, sqlc.UpsertFeatureImplStateParams{
+		ID:               id.String(),
+		ImplementationID: implID,
+		FeatureName:      featureName,
+		States:           string(raw),
+		InsertedAt:       now,
+		UpdatedAt:        now,
+	}); err != nil {
+		return fmt.Errorf("specs: UpsertFeatureImplState: %w", err)
+	}
+	return nil
 }
 
 func branchFromRow(row sqlc.Branch) *Branch {
