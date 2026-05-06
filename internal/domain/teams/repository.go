@@ -50,6 +50,21 @@ func IsInvalidTeamName(err error) bool { return errors.Is(err, ErrInvalidTeamNam
 // IsInvalidToken reports whether err is or wraps ErrInvalidToken.
 func IsInvalidToken(err error) bool { return errors.Is(err, ErrInvalidToken) }
 
+// ErrAlreadyMember is returned when the user is already a member of the team.
+var ErrAlreadyMember = errors.New("teams: user is already a member of this team")
+
+// IsAlreadyMember reports whether err is or wraps ErrAlreadyMember.
+func IsAlreadyMember(err error) bool { return errors.Is(err, ErrAlreadyMember) }
+
+// ErrLastOwner is returned when an operation would leave the team with no owners.
+var ErrLastOwner = errors.New("teams: cannot remove the last owner of a team")
+
+// IsLastOwner reports whether err is or wraps ErrLastOwner.
+func IsLastOwner(err error) bool { return errors.Is(err, ErrLastOwner) }
+
+// ErrInvalidRole is returned when an unrecognized role title is provided.
+var ErrInvalidRole = errors.New("teams: role must be one of owner, maintainer, developer, member")
+
 // CreateTeam inserts a new team with the given name.
 func (r *Repository) CreateTeam(ctx context.Context, name string) (*Team, error) {
 	id, err := uuid.NewV7()
@@ -326,6 +341,127 @@ func (r *Repository) IsMember(ctx context.Context, teamID, userID string) (bool,
 		return false, fmt.Errorf("teams: IsMember: %w", err)
 	}
 	return true, nil
+}
+
+// GetMemberRole returns the role title for userID in teamID, or sql.ErrNoRows wrapped as ErrNotFound.
+func (r *Repository) GetMemberRole(ctx context.Context, teamID, userID string) (string, error) {
+	q := sqlc.New(r.db.Read)
+	row, err := q.GetUserTeamRole(ctx, sqlc.GetUserTeamRoleParams{
+		TeamID: teamID,
+		UserID: userID,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("teams: GetMemberRole: %w", err)
+	}
+	return row.Title, nil
+}
+
+// validRoles is the set of accepted role titles.
+var validRoles = map[string]bool{
+	"owner":      true,
+	"maintainer": true,
+	"developer":  true,
+	"member":     true,
+}
+
+// AddMember inserts a user_team_roles row.
+// Returns ErrAlreadyMember if the user is already on the team.
+// Returns ErrInvalidRole if the role is not one of the accepted values.
+func (r *Repository) AddMember(ctx context.Context, teamID, userID, role string) error {
+	if !validRoles[role] {
+		return ErrInvalidRole
+	}
+	already, err := r.IsMember(ctx, teamID, userID)
+	if err != nil {
+		return err
+	}
+	if already {
+		return ErrAlreadyMember
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	q := sqlc.New(r.db.Write)
+	if err := q.CreateUserTeamRole(ctx, sqlc.CreateUserTeamRoleParams{
+		TeamID:     teamID,
+		UserID:     userID,
+		Title:      role,
+		InsertedAt: now,
+		UpdatedAt:  now,
+	}); err != nil {
+		return fmt.Errorf("teams: AddMember: %w", err)
+	}
+	return nil
+}
+
+// RemoveMember deletes the user_team_roles row.
+// Returns ErrLastOwner if removing the user would leave the team without owners.
+func (r *Repository) RemoveMember(ctx context.Context, teamID, userID string) error {
+	role, err := r.GetMemberRole(ctx, teamID, userID)
+	if err != nil {
+		return err
+	}
+	if role == "owner" {
+		count, err := r.CountOwners(ctx, teamID)
+		if err != nil {
+			return err
+		}
+		if count <= 1 {
+			return ErrLastOwner
+		}
+	}
+	q := sqlc.New(r.db.Write)
+	if err := q.DeleteUserTeamRole(ctx, sqlc.DeleteUserTeamRoleParams{
+		TeamID: teamID,
+		UserID: userID,
+	}); err != nil {
+		return fmt.Errorf("teams: RemoveMember: %w", err)
+	}
+	return nil
+}
+
+// UpdateMemberRole updates a user_team_roles entry's title.
+func (r *Repository) UpdateMemberRole(ctx context.Context, teamID, userID, newRole string) error {
+	if !validRoles[newRole] {
+		return ErrInvalidRole
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	q := sqlc.New(r.db.Write)
+	if err := q.UpdateUserTeamRole(ctx, sqlc.UpdateUserTeamRoleParams{
+		Title:     newRole,
+		UpdatedAt: now,
+		TeamID:    teamID,
+		UserID:    userID,
+	}); err != nil {
+		return fmt.Errorf("teams: UpdateMemberRole: %w", err)
+	}
+	return nil
+}
+
+// CountOwners returns the number of owner-titled members in the team.
+func (r *Repository) CountOwners(ctx context.Context, teamID string) (int64, error) {
+	q := sqlc.New(r.db.Read)
+	count, err := q.CountOwnersForTeam(ctx, teamID)
+	if err != nil {
+		return 0, fmt.Errorf("teams: CountOwners: %w", err)
+	}
+	return count, nil
+}
+
+// ListAccessTokensForTeam returns all access tokens belonging to teamID, ordered newest-first.
+func (r *Repository) ListAccessTokensForTeam(ctx context.Context, teamID string) ([]*AccessToken, error) {
+	q := sqlc.New(r.db.Read)
+	rows, err := q.ListAccessTokensForTeam(ctx, teamID)
+	if err != nil {
+		return nil, fmt.Errorf("teams: ListAccessTokensForTeam: %w", err)
+	}
+	out := make([]*AccessToken, 0, len(rows))
+	for i := range rows {
+		tok := accessTokenFromRow(rows[i])
+		out = append(out, tok)
+	}
+	return out, nil
 }
 
 // --- helpers ---

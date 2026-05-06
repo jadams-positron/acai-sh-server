@@ -14,6 +14,12 @@ UPDATE access_tokens
 SET revoked_at = ?, updated_at = ?
 WHERE id = ?;
 
+-- name: ListAccessTokensForTeam :many
+SELECT *
+FROM access_tokens
+WHERE team_id = ?
+ORDER BY inserted_at DESC;
+
 -- name: CreateAccessToken :one
 INSERT INTO access_tokens (
   id, user_id, team_id, name, token_hash, token_prefix,

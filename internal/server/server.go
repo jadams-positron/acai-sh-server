@@ -120,6 +120,17 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		FeatureView: featureViewSvc,
 	}
 	site.MountImplFeatureShowRoutes(browser, implFeatureShowDeps, csrfMW)
+	teamSettingsDeps := &handlers.TeamSettingsDeps{
+		Logger:   logger,
+		Teams:    deps.Teams,
+		Accounts: deps.Accounts,
+	}
+	site.MountTeamSettingsRoutes(browser, teamSettingsDeps, csrfMW)
+	teamTokensDeps := &handlers.TeamTokensDeps{
+		Logger: logger,
+		Teams:  deps.Teams,
+	}
+	site.MountTeamTokensRoutes(browser, teamTokensDeps, csrfMW)
 
 	// Static assets — public, no session.
 	handlers.MountStatic(e.Group(""))

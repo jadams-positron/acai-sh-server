@@ -9,6 +9,19 @@ import (
 	"context"
 )
 
+const countOwnersForTeam = `-- name: CountOwnersForTeam :one
+SELECT COUNT(*) AS count
+FROM user_team_roles
+WHERE team_id = ? AND title = 'owner'
+`
+
+func (q *Queries) CountOwnersForTeam(ctx context.Context, teamID string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countOwnersForTeam, teamID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createTeam = `-- name: CreateTeam :one
 INSERT INTO teams (id, name, global_admin, inserted_at, updated_at)
 VALUES (?, ?, ?, ?, ?)
@@ -63,6 +76,21 @@ func (q *Queries) CreateUserTeamRole(ctx context.Context, arg CreateUserTeamRole
 		arg.InsertedAt,
 		arg.UpdatedAt,
 	)
+	return err
+}
+
+const deleteUserTeamRole = `-- name: DeleteUserTeamRole :exec
+DELETE FROM user_team_roles
+WHERE team_id = ? AND user_id = ?
+`
+
+type DeleteUserTeamRoleParams struct {
+	TeamID string
+	UserID string
+}
+
+func (q *Queries) DeleteUserTeamRole(ctx context.Context, arg DeleteUserTeamRoleParams) error {
+	_, err := q.db.ExecContext(ctx, deleteUserTeamRole, arg.TeamID, arg.UserID)
 	return err
 }
 
@@ -210,4 +238,27 @@ func (q *Queries) ListTeamsForUser(ctx context.Context, userID string) ([]Team, 
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateUserTeamRole = `-- name: UpdateUserTeamRole :exec
+UPDATE user_team_roles
+SET title = ?, updated_at = ?
+WHERE team_id = ? AND user_id = ?
+`
+
+type UpdateUserTeamRoleParams struct {
+	Title     string
+	UpdatedAt string
+	TeamID    string
+	UserID    string
+}
+
+func (q *Queries) UpdateUserTeamRole(ctx context.Context, arg UpdateUserTeamRoleParams) error {
+	_, err := q.db.ExecContext(ctx, updateUserTeamRole,
+		arg.Title,
+		arg.UpdatedAt,
+		arg.TeamID,
+		arg.UserID,
+	)
+	return err
 }

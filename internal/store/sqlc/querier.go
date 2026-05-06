@@ -9,6 +9,7 @@ import (
 )
 
 type Querier interface {
+	CountOwnersForTeam(ctx context.Context, teamID string) (int64, error)
 	CreateAccessToken(ctx context.Context, arg CreateAccessTokenParams) (AccessToken, error)
 	CreateBranch(ctx context.Context, arg CreateBranchParams) (Branch, error)
 	CreateEmailToken(ctx context.Context, arg CreateEmailTokenParams) (EmailToken, error)
@@ -19,6 +20,7 @@ type Querier interface {
 	CreateUserTeamRole(ctx context.Context, arg CreateUserTeamRoleParams) error
 	DeleteEmailToken(ctx context.Context, id string) error
 	DeleteEmailTokensForUser(ctx context.Context, arg DeleteEmailTokensForUserParams) error
+	DeleteUserTeamRole(ctx context.Context, arg DeleteUserTeamRoleParams) error
 	GetAccessTokenByPrefix(ctx context.Context, tokenPrefix string) (AccessToken, error)
 	GetBranchByTeamRepoAndName(ctx context.Context, arg GetBranchByTeamRepoAndNameParams) (Branch, error)
 	GetEmailTokenByHashAndContext(ctx context.Context, arg GetEmailTokenByHashAndContextParams) (EmailToken, error)
@@ -33,6 +35,7 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
 	GetUserTeamRole(ctx context.Context, arg GetUserTeamRoleParams) (UserTeamRole, error)
+	ListAccessTokensForTeam(ctx context.Context, teamID string) ([]AccessToken, error)
 	ListBranchesForImplementation(ctx context.Context, implementationID string) ([]Branch, error)
 	ListDistinctFeatureNamesForProduct(ctx context.Context, productID string) ([]string, error)
 	ListFeatureBranchRefsForBranch(ctx context.Context, branchID string) ([]FeatureBranchRef, error)
@@ -57,6 +60,7 @@ type Querier interface {
 	UpdateAccessTokenLastUsed(ctx context.Context, arg UpdateAccessTokenLastUsedParams) error
 	UpdateBranchLastSeenCommit(ctx context.Context, arg UpdateBranchLastSeenCommitParams) error
 	UpdateUserConfirmedAt(ctx context.Context, arg UpdateUserConfirmedAtParams) error
+	UpdateUserTeamRole(ctx context.Context, arg UpdateUserTeamRoleParams) error
 	UpsertFeatureBranchRef(ctx context.Context, arg UpsertFeatureBranchRefParams) error
 	// Upserts the row for (implementation_id, feature_name) with the given states JSON.
 	// Insert if missing, update otherwise.
