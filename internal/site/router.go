@@ -42,3 +42,9 @@ func MountTeamShowRoutes(g *echo.Group, deps *handlers.TeamShowDeps, csrfMiddlew
 	authd.GET("/t/:team_name", handlers.TeamShow(deps))
 	authd.POST("/t/:team_name/products", handlers.TeamCreateProduct(deps))
 }
+
+// MountProductShowRoutes registers the product detail route (/t/:team_name/p/:product_name).
+func MountProductShowRoutes(g *echo.Group, deps *handlers.ProductShowDeps, csrfMiddleware echo.MiddlewareFunc) {
+	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
+	authd.GET("/t/:team_name/p/:product_name", handlers.ProductShow(deps))
+}

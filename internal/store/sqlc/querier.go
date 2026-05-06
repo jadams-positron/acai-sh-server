@@ -33,6 +33,7 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id string) (User, error)
 	GetUserTeamRole(ctx context.Context, arg GetUserTeamRoleParams) (UserTeamRole, error)
 	ListBranchesForImplementation(ctx context.Context, implementationID string) ([]Branch, error)
+	ListDistinctFeatureNamesForProduct(ctx context.Context, productID string) ([]string, error)
 	ListFeatureBranchRefsForBranch(ctx context.Context, branchID string) ([]FeatureBranchRef, error)
 	ListFeatureImplStatesForImpl(ctx context.Context, implementationID string) ([]FeatureImplState, error)
 	ListImplementationsByBranch(ctx context.Context, arg ListImplementationsByBranchParams) ([]ListImplementationsByBranchRow, error)

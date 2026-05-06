@@ -112,6 +112,11 @@ func (r *Repository) List(ctx context.Context, p ListByTeamParams) ([]*Implement
 	return impls, nil
 }
 
+// ListByProduct returns all active implementations under teamID for the given productID.
+func (r *Repository) ListByProduct(ctx context.Context, teamID, productID string) ([]*Implementation, error) {
+	return r.List(ctx, ListByTeamParams{TeamID: teamID, ProductID: &productID})
+}
+
 // CreateImplementationParams holds the inputs for Create.
 type CreateImplementationParams struct {
 	ProductID              string

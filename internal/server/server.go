@@ -98,6 +98,14 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Products: deps.Products,
 	}
 	site.MountTeamShowRoutes(browser, teamShowDeps, csrfMW)
+	productShowDeps := &handlers.ProductShowDeps{
+		Logger:          logger,
+		Teams:           deps.Teams,
+		Products:        deps.Products,
+		Implementations: deps.Implementations,
+		Specs:           deps.Specs,
+	}
+	site.MountProductShowRoutes(browser, productShowDeps, csrfMW)
 
 	// Static assets — public, no session.
 	handlers.MountStatic(e.Group(""))

@@ -327,6 +327,15 @@ a:hover {
     background: rgba(var(--color-accent-rgb), 0.06);
 }
 
+/* === Code === */
+code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.875em;
+    background: rgba(var(--color-accent-rgb), 0.08);
+    padding: 1px 4px;
+    border-radius: var(--radius-sm);
+}
+
 /* === Empty state === */
 .empty-state {
     padding: var(--space-md);
