@@ -1,3 +1,8 @@
+-- name: CreateImplementation :one
+INSERT INTO implementations (id, product_id, team_id, parent_implementation_id, name, is_active, inserted_at, updated_at)
+VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+RETURNING *;
+
 -- name: ListImplementationsByTeam :many
 SELECT i.id, i.product_id, i.team_id, i.parent_implementation_id,
        i.name, i.description, i.is_active, i.inserted_at, i.updated_at,

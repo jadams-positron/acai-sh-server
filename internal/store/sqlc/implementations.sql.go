@@ -9,6 +9,47 @@ import (
 	"context"
 )
 
+const createImplementation = `-- name: CreateImplementation :one
+INSERT INTO implementations (id, product_id, team_id, parent_implementation_id, name, is_active, inserted_at, updated_at)
+VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+RETURNING id, product_id, team_id, parent_implementation_id, name, description, is_active, inserted_at, updated_at
+`
+
+type CreateImplementationParams struct {
+	ID                     string
+	ProductID              string
+	TeamID                 string
+	ParentImplementationID *string
+	Name                   string
+	InsertedAt             string
+	UpdatedAt              string
+}
+
+func (q *Queries) CreateImplementation(ctx context.Context, arg CreateImplementationParams) (Implementation, error) {
+	row := q.db.QueryRowContext(ctx, createImplementation,
+		arg.ID,
+		arg.ProductID,
+		arg.TeamID,
+		arg.ParentImplementationID,
+		arg.Name,
+		arg.InsertedAt,
+		arg.UpdatedAt,
+	)
+	var i Implementation
+	err := row.Scan(
+		&i.ID,
+		&i.ProductID,
+		&i.TeamID,
+		&i.ParentImplementationID,
+		&i.Name,
+		&i.Description,
+		&i.IsActive,
+		&i.InsertedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listImplementationsByBranch = `-- name: ListImplementationsByBranch :many
 SELECT DISTINCT i.id, i.product_id, i.team_id, i.parent_implementation_id,
                 i.name, i.description, i.is_active, i.inserted_at, i.updated_at,

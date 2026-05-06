@@ -9,6 +9,41 @@ import (
 	"context"
 )
 
+const createProduct = `-- name: CreateProduct :one
+INSERT INTO products (id, team_id, name, is_active, inserted_at, updated_at)
+VALUES (?, ?, ?, 1, ?, ?)
+RETURNING id, team_id, name, description, is_active, inserted_at, updated_at
+`
+
+type CreateProductParams struct {
+	ID         string
+	TeamID     string
+	Name       string
+	InsertedAt string
+	UpdatedAt  string
+}
+
+func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error) {
+	row := q.db.QueryRowContext(ctx, createProduct,
+		arg.ID,
+		arg.TeamID,
+		arg.Name,
+		arg.InsertedAt,
+		arg.UpdatedAt,
+	)
+	var i Product
+	err := row.Scan(
+		&i.ID,
+		&i.TeamID,
+		&i.Name,
+		&i.Description,
+		&i.IsActive,
+		&i.InsertedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getProductByTeamAndName = `-- name: GetProductByTeamAndName :one
 SELECT id, team_id, name, description, is_active, inserted_at, updated_at
 FROM products
