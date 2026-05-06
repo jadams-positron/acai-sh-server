@@ -9,16 +9,22 @@ import (
 )
 
 type Querier interface {
+	CreateAccessToken(ctx context.Context, arg CreateAccessTokenParams) (AccessToken, error)
 	CreateEmailToken(ctx context.Context, arg CreateEmailTokenParams) (EmailToken, error)
+	CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteEmailToken(ctx context.Context, id string) error
 	DeleteEmailTokensForUser(ctx context.Context, arg DeleteEmailTokensForUserParams) error
+	GetAccessTokenByPrefix(ctx context.Context, tokenPrefix string) (AccessToken, error)
 	GetEmailTokenByHashAndContext(ctx context.Context, arg GetEmailTokenByHashAndContextParams) (EmailToken, error)
+	GetTeamByID(ctx context.Context, id string) (Team, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
 	MarkUserConfirmed(ctx context.Context, arg MarkUserConfirmedParams) error
 	// Ping returns 1 if the DB is reachable. Used by /_health.
 	Ping(ctx context.Context) (int64, error)
+	RevokeAccessToken(ctx context.Context, arg RevokeAccessTokenParams) error
+	UpdateAccessTokenLastUsed(ctx context.Context, arg UpdateAccessTokenLastUsedParams) error
 	UpdateUserConfirmedAt(ctx context.Context, arg UpdateUserConfirmedAtParams) error
 }
 
