@@ -78,6 +78,14 @@ func ImplShow(d *ImplShowDeps) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load features")
 		}
 
+		// Tracked branches — surfaced as a small section above the feature list
+		// so users see which branches feed this impl's data.
+		trackedBranches, err := d.Specs.ListTrackedBranchesForImpl(c.Request().Context(), impl.ID)
+		if err != nil {
+			d.Logger.Error("impl show: ListTrackedBranchesForImpl", "error", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load tracked branches")
+		}
+
 		shell, err := buildShellChrome(c, d.Teams, impl.Name+" · "+team.Name, team, "implementations", []views.Crumb{
 			{Label: "Teams", HRef: "/teams"},
 			{Label: team.Name, HRef: "/t/" + team.Name},
@@ -92,12 +100,13 @@ func ImplShow(d *ImplShowDeps) echo.HandlerFunc {
 
 		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 		return views.ImplShow(views.ImplShowProps{
-			Shell:          shell,
-			Team:           team,
-			Implementation: impl,
-			ImplSlug:       implSlug,
-			Parent:         parent,
-			FeatureNames:   featureNames,
+			Shell:           shell,
+			Team:            team,
+			Implementation:  impl,
+			ImplSlug:        implSlug,
+			Parent:          parent,
+			FeatureNames:    featureNames,
+			TrackedBranches: trackedBranches,
 		}).Render(c.Request().Context(), c.Response())
 	}
 }

@@ -10,17 +10,19 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
+	domainspecs "github.com/jadams-positron/acai-sh-server/internal/domain/specs"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 )
 
 // ImplShowProps drives the /t/{team_name}/i/{impl_slug} page.
 type ImplShowProps struct {
-	Shell          ShellProps
-	Team           *teams.Team
-	Implementation *implementations.Implementation
-	ImplSlug       string
-	Parent         *implementations.Implementation // nil if no parent
-	FeatureNames   []string                        // distinct features under the impl's product
+	Shell           ShellProps
+	Team            *teams.Team
+	Implementation  *implementations.Implementation
+	ImplSlug        string
+	Parent          *implementations.Implementation // nil if no parent
+	FeatureNames    []string                        // distinct features under the impl's product
+	TrackedBranches []*domainspecs.Branch           // branches feeding this impl
 }
 
 func ImplShow(p ImplShowProps) templ.Component {
@@ -63,7 +65,7 @@ func ImplShow(p ImplShowProps) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(p.Implementation.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 21, Col: 44}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 23, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -76,7 +78,7 @@ func ImplShow(p ImplShowProps) templ.Component {
 			var templ_7745c5c3_Var4 templ.SafeURL
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/t/" + p.Team.Name + "/p/" + p.Implementation.ProductName))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 24, Col: 87}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 26, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -89,7 +91,7 @@ func ImplShow(p ImplShowProps) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(p.Implementation.ProductName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 25, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 27, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -103,7 +105,7 @@ func ImplShow(p ImplShowProps) templ.Component {
 				var templ_7745c5c3_Var6 string
 				templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(" · ")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 28, Col: 13}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 30, Col: 13}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 				if templ_7745c5c3_Err != nil {
@@ -116,7 +118,7 @@ func ImplShow(p ImplShowProps) templ.Component {
 				var templ_7745c5c3_Var7 templ.SafeURL
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/t/" + p.Team.Name + "/i/" + implSlug(p.Parent)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 30, Col: 78}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 32, Col: 78}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -129,7 +131,7 @@ func ImplShow(p ImplShowProps) templ.Component {
 				var templ_7745c5c3_Var8 string
 				templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(p.Parent.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 31, Col: 21}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 33, Col: 21}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 				if templ_7745c5c3_Err != nil {
@@ -143,7 +145,7 @@ func ImplShow(p ImplShowProps) templ.Component {
 				var templ_7745c5c3_Var9 string
 				templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(" · ")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 34, Col: 13}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 36, Col: 13}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 				if templ_7745c5c3_Err != nil {
@@ -166,7 +168,7 @@ func ImplShow(p ImplShowProps) templ.Component {
 				var templ_7745c5c3_Var10 string
 				templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(*p.Implementation.Description)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 39, Col: 55}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 41, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 				if templ_7745c5c3_Err != nil {
@@ -177,64 +179,143 @@ func ImplShow(p ImplShowProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</header><section><h2 style=\"font-size: var(--text-2xl); margin: 0 0 var(--space-md);\">Features</h2>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</header>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if len(p.FeatureNames) == 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div class=\"empty-state\"><p>No features yet for this product. Push a spec via <code>acai push</code>.</p></div>")
+			if len(p.TrackedBranches) > 0 {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<section style=\"margin-bottom: var(--space-xl);\"><h2 style=\"font-size: var(--text-2xl); margin: 0 0 var(--space-md);\">Tracked branches</h2><div class=\"panel\" style=\"padding: 0;\"><table style=\"width: 100%; border-collapse: collapse;\"><thead><tr style=\"border-bottom: 1px solid var(--border-subtle); text-align: left;\"><th style=\"padding: var(--space-md);\">Branch</th><th style=\"padding: var(--space-md);\">Repo</th><th style=\"padding: var(--space-md);\">Last commit</th></tr></thead> <tbody>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"panel\" style=\"padding: 0;\"><ul style=\"list-style: none; margin: 0; padding: 0;\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				for i, name := range p.FeatureNames {
-					if i > 0 {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<li style=\"border-top: 1px solid var(--border-subtle);\"></li>")
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, " <li><a href=\"")
+				for _, b := range p.TrackedBranches {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<tr style=\"border-top: 1px solid var(--border-subtle);\"><td style=\"padding: var(--space-md); font-family: var(--font-mono); font-size: var(--text-sm);\"><a href=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var11 templ.SafeURL
-					templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/t/" + p.Team.Name + "/i/" + p.ImplSlug + "/f/" + name))
+					templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/t/" + p.Team.Name + "/branches"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 58, Col: 86}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 61, Col: 68}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\" style=\"display: block; padding: var(--space-md); color: var(--fg); text-decoration: none;\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var12 string
-					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(name)
+					templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(b.BranchName)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 61, Col: 15}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 61, Col: 85}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</a></li>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</a></td><td style=\"padding: var(--space-md); font-family: var(--font-mono); font-size: var(--text-sm); color: var(--muted);\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var13 string
+					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(shortenRepoURI(b.RepoURI))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 64, Col: 37}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</td><td style=\"padding: var(--space-md); font-family: var(--font-mono); font-size: var(--text-sm); color: var(--muted);\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					if b.LastSeenCommit != "" {
+						var templ_7745c5c3_Var14 string
+						templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(shortCommit(b.LastSeenCommit))
+						if templ_7745c5c3_Err != nil {
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 68, Col: 42}
+						}
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					} else {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<span class=\"subtitle\">—</span>")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</td></tr>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</ul></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</tbody></table></div></section>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</section>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, " <section><h2 style=\"font-size: var(--text-2xl); margin: 0 0 var(--space-md);\">Features</h2>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if len(p.FeatureNames) == 0 {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<div class=\"empty-state\"><p>No features yet for this product. Push a spec via <code>acai push</code>.</p></div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"panel\" style=\"padding: 0;\"><ul style=\"list-style: none; margin: 0; padding: 0;\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				for i, name := range p.FeatureNames {
+					if i > 0 {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<li style=\"border-top: 1px solid var(--border-subtle);\"></li>")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, " <li><a href=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var15 templ.SafeURL
+					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/t/" + p.Team.Name + "/i/" + p.ImplSlug + "/f/" + name))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 96, Col: 86}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "\" style=\"display: block; padding: var(--space-md); color: var(--fg); text-decoration: none;\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var16 string
+					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(name)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/site/views/impl_show.templ`, Line: 99, Col: 15}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</a></li>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</ul></div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</section>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
