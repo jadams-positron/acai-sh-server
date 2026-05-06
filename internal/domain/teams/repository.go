@@ -3,6 +3,7 @@ package teams
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -24,6 +25,12 @@ type Repository struct {
 
 // NewRepository returns a Repository over db.
 func NewRepository(db *store.DB) *Repository { return &Repository{db: db} }
+
+// ErrNotFound is returned when no matching team exists.
+var ErrNotFound = errors.New("teams: not found")
+
+// IsNotFound reports whether err is or wraps ErrNotFound.
+func IsNotFound(err error) bool { return errors.Is(err, ErrNotFound) }
 
 // ErrInvalidToken is returned when token verification fails for any reason.
 var ErrInvalidToken = errors.New("teams: invalid token")
@@ -261,6 +268,64 @@ func (r *Repository) RevokeAccessTokenByPrefix(ctx context.Context, prefix strin
 		return fmt.Errorf("teams: RevokeAccessToken: %w", err)
 	}
 	return nil
+}
+
+// GetByName returns the team with the given name (case-insensitive), or
+// ErrNotFound. The user's authorization to view the team is checked separately.
+func (r *Repository) GetByName(ctx context.Context, name string) (*Team, error) {
+	q := sqlc.New(r.db.Read)
+	row, err := q.GetTeamByName(ctx, name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("teams: GetByName: %w", err)
+	}
+	return teamFromRow(row)
+}
+
+// Member is one row of a team's membership listing.
+type Member struct {
+	UserID   string
+	Email    string
+	Role     string
+	JoinedAt time.Time
+}
+
+// ListMembers returns all members of teamID ordered by join date.
+func (r *Repository) ListMembers(ctx context.Context, teamID string) ([]*Member, error) {
+	q := sqlc.New(r.db.Read)
+	rows, err := q.ListMembersForTeam(ctx, teamID)
+	if err != nil {
+		return nil, fmt.Errorf("teams: ListMembers: %w", err)
+	}
+	out := make([]*Member, 0, len(rows))
+	for _, row := range rows {
+		joinedAt, _ := time.Parse(time.RFC3339Nano, row.JoinedAt)
+		out = append(out, &Member{
+			UserID:   row.UserID,
+			Email:    row.UserEmail,
+			Role:     row.RoleTitle,
+			JoinedAt: joinedAt,
+		})
+	}
+	return out, nil
+}
+
+// IsMember reports whether userID has a user_team_roles entry for teamID.
+func (r *Repository) IsMember(ctx context.Context, teamID, userID string) (bool, error) {
+	q := sqlc.New(r.db.Read)
+	_, err := q.GetUserTeamRole(ctx, sqlc.GetUserTeamRoleParams{
+		TeamID: teamID,
+		UserID: userID,
+	})
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("teams: IsMember: %w", err)
+	}
+	return true, nil
 }
 
 // --- helpers ---

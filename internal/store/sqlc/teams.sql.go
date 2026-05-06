@@ -86,6 +86,95 @@ func (q *Queries) GetTeamByID(ctx context.Context, id string) (Team, error) {
 	return i, err
 }
 
+const getTeamByName = `-- name: GetTeamByName :one
+SELECT id, name, global_admin, inserted_at, updated_at
+FROM teams
+WHERE name = ? COLLATE NOCASE
+LIMIT 1
+`
+
+func (q *Queries) GetTeamByName(ctx context.Context, name string) (Team, error) {
+	row := q.db.QueryRowContext(ctx, getTeamByName, name)
+	var i Team
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.GlobalAdmin,
+		&i.InsertedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getUserTeamRole = `-- name: GetUserTeamRole :one
+SELECT team_id, user_id, title, inserted_at, updated_at
+FROM user_team_roles
+WHERE team_id = ? AND user_id = ?
+LIMIT 1
+`
+
+type GetUserTeamRoleParams struct {
+	TeamID string
+	UserID string
+}
+
+func (q *Queries) GetUserTeamRole(ctx context.Context, arg GetUserTeamRoleParams) (UserTeamRole, error) {
+	row := q.db.QueryRowContext(ctx, getUserTeamRole, arg.TeamID, arg.UserID)
+	var i UserTeamRole
+	err := row.Scan(
+		&i.TeamID,
+		&i.UserID,
+		&i.Title,
+		&i.InsertedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listMembersForTeam = `-- name: ListMembersForTeam :many
+SELECT u.id AS user_id, u.email AS user_email, utr.title AS role_title,
+       utr.inserted_at AS joined_at
+FROM user_team_roles utr
+JOIN users u ON u.id = utr.user_id
+WHERE utr.team_id = ?
+ORDER BY utr.inserted_at
+`
+
+type ListMembersForTeamRow struct {
+	UserID    string
+	UserEmail string
+	RoleTitle string
+	JoinedAt  string
+}
+
+func (q *Queries) ListMembersForTeam(ctx context.Context, teamID string) ([]ListMembersForTeamRow, error) {
+	rows, err := q.db.QueryContext(ctx, listMembersForTeam, teamID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMembersForTeamRow{}
+	for rows.Next() {
+		var i ListMembersForTeamRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.UserEmail,
+			&i.RoleTitle,
+			&i.JoinedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTeamsForUser = `-- name: ListTeamsForUser :many
 SELECT t.id, t.name, t.global_admin, t.inserted_at, t.updated_at
 FROM teams t

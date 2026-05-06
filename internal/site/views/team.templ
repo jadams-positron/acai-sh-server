@@ -1,0 +1,121 @@
+package views
+
+import (
+	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+)
+
+// TeamShowProps drives the /t/{team_name} page.
+type TeamShowProps struct {
+	Team                 *teams.Team
+	Products             []*products.Product
+	Members              []*teams.Member
+	CSRFToken            string
+	Flash                string
+	PrefilledProductName string
+}
+
+templ TeamShow(p TeamShowProps) {
+	@Layout(p.Team.Name) {
+		<header class="page-header">
+			<h1 class="title">{ p.Team.Name }</h1>
+			<p class="subtitle">
+				<a href="/teams">← All teams</a>
+			</p>
+		</header>
+		if p.Flash != "" {
+			<div class="banner banner-error">{ p.Flash }</div>
+		}
+		<div data-signals="{showProductModal: false}" style="display: grid; gap: var(--space-xl);">
+			<section>
+				<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
+					<h2 style="font-size: var(--text-2xl); margin: 0;">Products</h2>
+					<button class="button button-primary" data-on-click="$showProductModal = true" type="button">
+						+ Create Product
+					</button>
+				</div>
+				if len(p.Products) == 0 {
+					<div class="empty-state">
+						<p>No products yet. Create one to get started.</p>
+					</div>
+				} else {
+					<div style="display: grid; gap: var(--space-md); grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));">
+						for _, prod := range p.Products {
+							<a
+								href={ templ.SafeURL("/t/" + p.Team.Name + "/p/" + prod.Name) }
+								class="panel"
+								style="display: block; text-decoration: none; color: inherit;"
+							>
+								<h3 style="margin: 0 0 var(--space-xs); font-size: var(--text-lg);">{ prod.Name }</h3>
+								if prod.Description != nil && *prod.Description != "" {
+									<p class="subtitle" style="margin: 0;">{ *prod.Description }</p>
+								} else {
+									<p class="subtitle" style="margin: 0;">View product →</p>
+								}
+							</a>
+						}
+					</div>
+				}
+			</section>
+			<section>
+				<h2 style="font-size: var(--text-2xl); margin: 0 0 var(--space-md);">Members</h2>
+				<div class="panel" style="padding: 0;">
+					<table style="width: 100%; border-collapse: collapse;">
+						<thead>
+							<tr style="border-bottom: 1px solid var(--border-subtle);">
+								<th style="text-align: left; padding: var(--space-md);">Email</th>
+								<th style="text-align: left; padding: var(--space-md);">Role</th>
+							</tr>
+						</thead>
+						<tbody>
+							for _, m := range p.Members {
+								<tr style="border-bottom: 1px solid var(--border-subtle);">
+									<td style="padding: var(--space-md);">{ m.Email }</td>
+									<td style="padding: var(--space-md);">
+										<span class="badge">{ m.Role }</span>
+									</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+			</section>
+			<div
+				data-show="$showProductModal"
+				style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 100;"
+			>
+				<div class="panel" style="max-width: 420px; width: 90%;" data-on-click__stop>
+					<div class="panel-header">
+						<h1>Create Product</h1>
+					</div>
+					<form method="post" action={ templ.SafeURL("/t/" + p.Team.Name + "/products") } class="form">
+						<input type="hidden" name="gorilla.csrf.Token" value={ p.CSRFToken }/>
+						<div class="form-field">
+							<label class="form-label" for="product-name">Product name</label>
+							<input
+								id="product-name"
+								class="form-input"
+								type="text"
+								name="name"
+								value={ p.PrefilledProductName }
+								required
+								autofocus
+								placeholder="my-product"
+								pattern="[a-zA-Z0-9_-]+"
+								title="Alphanumeric, hyphens, and underscores only"
+							/>
+						</div>
+						<div style="display: flex; gap: var(--space-sm); justify-content: flex-end;">
+							<button type="button" class="button button-ghost" data-on-click="$showProductModal = false">
+								Cancel
+							</button>
+							<button type="submit" class="button button-primary">
+								Create
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	}
+}

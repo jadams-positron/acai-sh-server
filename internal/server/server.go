@@ -92,6 +92,12 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Teams:  deps.Teams,
 	}
 	site.MountTeamsRoutes(browser, teamsHandlerDeps, csrfMW)
+	teamShowDeps := &handlers.TeamShowDeps{
+		Logger:   logger,
+		Teams:    deps.Teams,
+		Products: deps.Products,
+	}
+	site.MountTeamShowRoutes(browser, teamShowDeps, csrfMW)
 
 	// Static assets — public, no session.
 	handlers.MountStatic(e.Group(""))
