@@ -67,6 +67,12 @@ func MountImplsIndexRoutes(g *echo.Group, deps *handlers.ImplsIndexDeps, csrfMid
 	authd.GET("/t/:team_name/implementations", handlers.ImplsIndex(deps))
 }
 
+// MountFeaturesIndexRoutes registers the /t/:team_name/features cross-product index route.
+func MountFeaturesIndexRoutes(g *echo.Group, deps *handlers.FeaturesIndexDeps, csrfMiddleware echo.MiddlewareFunc) {
+	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
+	authd.GET("/t/:team_name/features", handlers.FeaturesIndex(deps))
+}
+
 // MountImplShowRoutes registers the /t/:team_name/i/:impl_slug detail route.
 func MountImplShowRoutes(g *echo.Group, deps *handlers.ImplShowDeps, csrfMiddleware echo.MiddlewareFunc) {
 	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
