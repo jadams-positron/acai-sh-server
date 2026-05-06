@@ -21,6 +21,7 @@ type ImplShowDeps struct {
 	Teams           *teams.Repository
 	Implementations *implementations.Repository
 	Specs           *specs.Repository
+	FeatureView     *services.FeatureViewService
 }
 
 // ImplShow renders GET /t/:team_name/i/:impl_slug.
@@ -71,19 +72,22 @@ func ImplShow(d *ImplShowDeps) echo.HandlerFunc {
 			}
 		}
 
-		// Feature names available on the impl's product.
-		featureNames, err := d.Specs.ListDistinctFeatureNamesForProduct(c.Request().Context(), impl.ProductID)
-		if err != nil {
-			d.Logger.Error("impl show: ListDistinctFeatureNamesForProduct", "error", err)
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load features")
-		}
-
 		// Tracked branches — surfaced as a small section above the feature list
 		// so users see which branches feed this impl's data.
 		trackedBranches, err := d.Specs.ListTrackedBranchesForImpl(c.Request().Context(), impl.ID)
 		if err != nil {
 			d.Logger.Error("impl show: ListTrackedBranchesForImpl", "error", err)
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load tracked branches")
+		}
+
+		// Per-feature progress overview (counts by status), plus the aggregate
+		// roll-up shown in the page header banner.
+		overview, err := d.FeatureView.ResolveImplOverview(c.Request().Context(), services.ImplOverviewRequest{
+			Implementation: impl,
+		})
+		if err != nil {
+			d.Logger.Error("impl show: ResolveImplOverview", "error", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load impl overview")
 		}
 
 		shell, err := buildShellChrome(c, d.Teams, impl.Name+" · "+team.Name, team, "implementations", []views.Crumb{
@@ -105,7 +109,7 @@ func ImplShow(d *ImplShowDeps) echo.HandlerFunc {
 			Implementation:  impl,
 			ImplSlug:        implSlug,
 			Parent:          parent,
-			FeatureNames:    featureNames,
+			Overview:        overview,
 			TrackedBranches: trackedBranches,
 		}).Render(c.Request().Context(), c.Response())
 	}

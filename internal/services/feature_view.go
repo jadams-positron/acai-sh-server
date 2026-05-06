@@ -4,6 +4,8 @@ package services
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sort"
 	"time"
 
@@ -108,6 +110,84 @@ func (s *FeatureViewService) Resolve(ctx context.Context, req FeatureViewRequest
 
 	out.Cards = orderByHierarchy(out.Cards)
 
+	return out, nil
+}
+
+// ImplFeatureSummary is one row in an impl-overview table — name, total
+// ACIDs from the spec, and the per-status fold computed by buildStatusCounts.
+//
+// Distinct from services.FeatureSummary which is the existing
+// /api/v1/implementation-features wire shape (test/ref counts, sources, etc.).
+type ImplFeatureSummary struct {
+	FeatureName       string
+	TotalRequirements int
+	Counts            StatusCounts
+}
+
+// ImplOverview composes the per-feature breakdown plus the team-wide
+// aggregate for one implementation.
+type ImplOverview struct {
+	Features        []*ImplFeatureSummary
+	AggregateTotal  int
+	AggregateCounts StatusCounts
+}
+
+// ImplOverviewRequest is the input to ResolveImplOverview.
+type ImplOverviewRequest struct {
+	Implementation *implementations.Implementation
+}
+
+// ResolveImplOverview returns the per-feature progress breakdown for one
+// implementation, plus an aggregate fold across all features. Features that
+// have no spec on this impl's tracked branches are skipped — they don't
+// belong to this impl's lifecycle.
+//
+// Cost: 1 query for branches + N queries for spec lookups + 1 batched
+// states query + per-feature in-memory fold. Acceptable at typical impl
+// sizes (handful of features); a single batched JOIN is the obvious next
+// move if feature counts grow.
+func (s *FeatureViewService) ResolveImplOverview(ctx context.Context, req ImplOverviewRequest) (*ImplOverview, error) {
+	impl := req.Implementation
+	if impl == nil {
+		return nil, fmt.Errorf("services: ResolveImplOverview: implementation is required")
+	}
+
+	branch, err := s.specs.FirstTrackedBranch(ctx, impl.ID)
+	if err != nil {
+		// No tracked branches means no specs / no progress to report.
+		if errors.Is(err, specs.ErrNotFound) {
+			return &ImplOverview{}, nil
+		}
+		return nil, fmt.Errorf("services: ResolveImplOverview: branch lookup: %w", err)
+	}
+
+	specsByName, err := s.specs.ListSpecsForBranch(ctx, branch.ID)
+	if err != nil {
+		return nil, fmt.Errorf("services: ResolveImplOverview: list specs: %w", err)
+	}
+
+	out := &ImplOverview{}
+	for _, sp := range specsByName {
+		states, _ := s.specs.GetStates(ctx, impl.ID, sp.FeatureName)
+		total := len(sp.Requirements)
+		counts := buildStatusCounts(states, total)
+		out.Features = append(out.Features, &ImplFeatureSummary{
+			FeatureName:       sp.FeatureName,
+			TotalRequirements: total,
+			Counts:            counts,
+		})
+		out.AggregateTotal += total
+		out.AggregateCounts.Null += counts.Null
+		out.AggregateCounts.Assigned += counts.Assigned
+		out.AggregateCounts.Blocked += counts.Blocked
+		out.AggregateCounts.Incomplete += counts.Incomplete
+		out.AggregateCounts.Completed += counts.Completed
+		out.AggregateCounts.Rejected += counts.Rejected
+		out.AggregateCounts.Accepted += counts.Accepted
+	}
+	sort.Slice(out.Features, func(i, j int) bool {
+		return out.Features[i].FeatureName < out.Features[j].FeatureName
+	})
 	return out, nil
 }
 
