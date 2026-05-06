@@ -43,6 +43,9 @@ type Querier interface {
 	RevokeAccessToken(ctx context.Context, arg RevokeAccessTokenParams) error
 	UpdateAccessTokenLastUsed(ctx context.Context, arg UpdateAccessTokenLastUsedParams) error
 	UpdateUserConfirmedAt(ctx context.Context, arg UpdateUserConfirmedAtParams) error
+	// Upserts the row for (implementation_id, feature_name) with the given states JSON.
+	// Insert if missing, update otherwise.
+	UpsertFeatureImplState(ctx context.Context, arg UpsertFeatureImplStateParams) error
 }
 
 var _ Querier = (*Queries)(nil)
