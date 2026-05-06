@@ -1,0 +1,70 @@
+package views
+
+import (
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+)
+
+// FeaturesIndexEntry is one row in the features index — the feature name
+// and the (sorted, deduped) list of products that carry it.
+type FeaturesIndexEntry struct {
+	FeatureName  string
+	ProductNames []string
+}
+
+// FeaturesIndexProps drives the /t/{team_name}/features page.
+type FeaturesIndexProps struct {
+	Shell    ShellProps
+	Team     *teams.Team
+	Features []FeaturesIndexEntry
+}
+
+templ FeaturesIndex(p FeaturesIndexProps) {
+	@Shell(p.Shell) {
+		<header class="page-header">
+			<h1 class="title">Features</h1>
+			<p class="subtitle">All features across products in <strong>{ p.Team.Name }</strong>.</p>
+		</header>
+		if len(p.Features) == 0 {
+			<div class="empty-state">
+				<p>No features yet. Push a spec via <code>acai push</code>.</p>
+			</div>
+		} else {
+			<div class="panel" style="padding: 0;">
+				<table style="width: 100%; border-collapse: collapse;">
+					<thead>
+						<tr style="border-bottom: 1px solid var(--border-subtle); text-align: left;">
+							<th style="padding: var(--space-md);">Feature</th>
+							<th style="padding: var(--space-md);">Products</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, f := range p.Features {
+							@featuresIndexRow(p.Team.Name, f)
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	}
+}
+
+templ featuresIndexRow(teamName string, f FeaturesIndexEntry) {
+	<tr style="border-top: 1px solid var(--border-subtle);">
+		<td style="padding: var(--space-md);">
+			<a href={ templ.SafeURL("/t/" + teamName + "/f/" + f.FeatureName) }>{ f.FeatureName }</a>
+		</td>
+		<td style="padding: var(--space-md);">
+			<div style="display: flex; flex-wrap: wrap; gap: var(--space-xs);">
+				for _, prod := range f.ProductNames {
+					<a
+						class="badge"
+						style="text-decoration: none;"
+						href={ templ.SafeURL("/t/" + teamName + "/p/" + prod) }
+					>
+						{ prod }
+					</a>
+				}
+			</div>
+		</td>
+	</tr>
+}
