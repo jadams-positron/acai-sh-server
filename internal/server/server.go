@@ -93,13 +93,14 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Teams:  deps.Teams,
 	}
 	site.MountTeamsRoutes(browser, teamsHandlerDeps, csrfMW)
+	featureViewSvc := services.NewFeatureViewService(deps.Products, deps.Implementations, deps.Specs)
 	teamShowDeps := &handlers.TeamShowDeps{
-		Logger:   logger,
-		Teams:    deps.Teams,
-		Products: deps.Products,
+		Logger:      logger,
+		Teams:       deps.Teams,
+		Products:    deps.Products,
+		FeatureView: featureViewSvc,
 	}
 	site.MountTeamShowRoutes(browser, teamShowDeps, csrfMW)
-	featureViewSvc := services.NewFeatureViewService(deps.Products, deps.Implementations, deps.Specs)
 	productShowDeps := &handlers.ProductShowDeps{
 		Logger:          logger,
 		Teams:           deps.Teams,

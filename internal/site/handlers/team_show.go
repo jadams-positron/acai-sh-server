@@ -10,14 +10,16 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+	"github.com/jadams-positron/acai-sh-server/internal/services"
 	"github.com/jadams-positron/acai-sh-server/internal/site/views"
 )
 
 // TeamShowDeps groups dependencies for the team detail page.
 type TeamShowDeps struct {
-	Logger   *slog.Logger
-	Teams    *teams.Repository
-	Products *products.Repository
+	Logger      *slog.Logger
+	Teams       *teams.Repository
+	Products    *products.Repository
+	FeatureView *services.FeatureViewService
 }
 
 // TeamShow renders GET /t/:team_name.
@@ -53,6 +55,20 @@ func TeamShow(d *TeamShowDeps) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load products")
 		}
 
+		// Heatmap roll-up — one row per product, one column per feature.
+		// Skipped when there are no products yet (the empty-state nudge owns
+		// that screen).
+		var heatmap *services.TeamHeatmap
+		if len(prods) > 0 {
+			heatmap, err = d.FeatureView.ResolveTeamHeatmap(c.Request().Context(), services.TeamHeatmapRequest{
+				TeamID: team.ID,
+			})
+			if err != nil {
+				d.Logger.Error("team show: ResolveTeamHeatmap", "error", err)
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to load team overview")
+			}
+		}
+
 		members, err := d.Teams.ListMembers(c.Request().Context(), team.ID)
 		if err != nil {
 			d.Logger.Error("team show: ListMembers", "error", err)
@@ -72,6 +88,7 @@ func TeamShow(d *TeamShowDeps) echo.HandlerFunc {
 			Shell:     shell,
 			Team:      team,
 			Products:  prods,
+			Heatmap:   heatmap,
 			Members:   members,
 			CSRFToken: csrfTokenFromEcho(c),
 		}).Render(c.Request().Context(), c.Response())

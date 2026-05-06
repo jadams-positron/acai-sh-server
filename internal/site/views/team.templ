@@ -1,8 +1,12 @@
 package views
 
 import (
+	"fmt"
+	"strconv"
+
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+	"github.com/jadams-positron/acai-sh-server/internal/services"
 )
 
 // TeamShowProps drives the /t/{team_name} page.
@@ -10,6 +14,7 @@ type TeamShowProps struct {
 	Shell                ShellProps
 	Team                 *teams.Team
 	Products             []*products.Product
+	Heatmap              *services.TeamHeatmap // nil when there are no products
 	Members              []*teams.Member
 	CSRFToken            string
 	Flash                string
@@ -25,6 +30,10 @@ templ TeamShow(p TeamShowProps) {
 			<div class="banner banner-error">{ p.Flash }</div>
 		}
 		<div data-signals="{showProductModal: false}" style="display: grid; gap: var(--space-xl);">
+			if p.Heatmap != nil && p.Heatmap.AggregateTotal > 0 {
+				@teamOverviewBanner(p.Heatmap)
+				@teamHeatmap(p.Team.Name, p.Heatmap)
+			}
 			<section>
 				<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
 					<h2 style="font-size: var(--text-2xl); margin: 0;">Products</h2>
@@ -122,4 +131,166 @@ templ TeamShow(p TeamShowProps) {
 			</div>
 		</div>
 	}
+}
+
+templ teamOverviewBanner(h *services.TeamHeatmap) {
+	<section class="panel">
+		<div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-md); gap: var(--space-md); flex-wrap: wrap;">
+			<div>
+				<h2 style="font-size: var(--text-xl); margin: 0;">Progress</h2>
+				<p class="subtitle" style="margin: var(--space-xs) 0 0;">
+					{ pluralize(len(h.Rows), "product") }
+					{ " · " }
+					{ pluralize(h.ImplCount, "implementation") }
+					{ " · " }
+					{ pluralize(len(h.FeatureNames), "feature") }
+					{ " · " }
+					{ fmt.Sprintf("%d acceptance criteria", h.AggregateTotal) }
+				</p>
+			</div>
+			<div style="text-align: right; font-size: var(--text-2xl); font-weight: 600;">
+				{ fmt.Sprintf("%d%%", percentInt(h.AggregateCounts.Completed+h.AggregateCounts.Accepted, h.AggregateTotal)) }
+				<div class="subtitle" style="font-size: var(--text-sm); font-weight: 400; margin-top: 2px;">complete</div>
+			</div>
+		</div>
+		@progressBar(h.AggregateCounts, h.AggregateTotal)
+		<div style="margin-top: var(--space-md);">
+			@statusLegend(h.AggregateCounts)
+		</div>
+	</section>
+}
+
+// teamHeatmap renders the products × features matrix. Rows are products,
+// columns are features (rotated 45° headers), cells are colored by their
+// completion ratio with a red overlay when blocked.
+templ teamHeatmap(teamName string, h *services.TeamHeatmap) {
+	<section>
+		<h2 style="font-size: var(--text-2xl); margin: 0 0 var(--space-md);">Coverage</h2>
+		<p class="subtitle" style="margin: 0 0 var(--space-md); max-width: 64ch;">
+			Each cell is one product's progress on one feature, summed across that product's implementations. Click a feature to see it across the team; click a product to drill in.
+		</p>
+		<div class="panel heatmap-panel">
+			<div class="heatmap-scroll">
+				<table class="heatmap" cellspacing="0" cellpadding="0">
+					<thead>
+						<tr>
+							<th class="heatmap-corner"></th>
+							for _, name := range h.FeatureNames {
+								<th class="heatmap-th-feature" scope="col">
+									<a href={ templ.SafeURL("/t/" + teamName + "/f/" + name) }>
+										<span>{ name }</span>
+									</a>
+								</th>
+							}
+							<th class="heatmap-th-rowtotal" scope="col">
+								<span>Total</span>
+							</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, row := range h.Rows {
+							@teamHeatmapRow(teamName, row)
+						}
+					</tbody>
+				</table>
+			</div>
+			<div class="heatmap-legend">
+				<span class="heatmap-legend-label">none</span>
+				<span class="heatmap-legend-swatch" data-fill="0"></span>
+				<span class="heatmap-legend-swatch" data-fill="25"></span>
+				<span class="heatmap-legend-swatch" data-fill="50"></span>
+				<span class="heatmap-legend-swatch" data-fill="75"></span>
+				<span class="heatmap-legend-swatch" data-fill="100"></span>
+				<span class="heatmap-legend-label">complete</span>
+				<span style="width: var(--space-md);"></span>
+				<span class="heatmap-legend-swatch heatmap-legend-blocked"></span>
+				<span class="heatmap-legend-label">has blocked</span>
+				<span style="width: var(--space-md);"></span>
+				<span class="heatmap-legend-swatch heatmap-legend-empty"></span>
+				<span class="heatmap-legend-label">not in product</span>
+			</div>
+		</div>
+	</section>
+}
+
+templ teamHeatmapRow(teamName string, row *services.HeatmapRow) {
+	<tr>
+		<th class="heatmap-th-product" scope="row">
+			<a href={ templ.SafeURL("/t/" + teamName + "/p/" + row.ProductName) }>{ row.ProductName }</a>
+		</th>
+		for _, cell := range row.Cells {
+			@teamHeatmapCell(teamName, cell)
+		}
+		<td class="heatmap-cell-total">
+			if row.ProductPresent && row.ProductTotal > 0 {
+				<div class="heatmap-cell-total-pct">
+					{ fmt.Sprintf("%d%%", percentInt(row.ProductCounts.Completed+row.ProductCounts.Accepted, row.ProductTotal)) }
+				</div>
+				<div class="heatmap-cell-total-meta">
+					{ fmt.Sprintf("%d ACIDs", row.ProductTotal) }
+				</div>
+			} else {
+				<div class="heatmap-cell-total-pct subtitle">—</div>
+			}
+		</td>
+	</tr>
+}
+
+templ teamHeatmapCell(teamName string, cell *services.HeatmapCell) {
+	if !cell.Present {
+		<td class="heatmap-cell heatmap-cell-empty" title={ cell.ProductName + " · " + cell.FeatureName + ": not in this product" }></td>
+	} else {
+		<td
+			class={ heatmapCellClass(cell) }
+			style={ "--cell-fill: " + heatmapCellFill(cell) }
+			title={ heatmapCellTitle(cell) }
+		>
+			<a href={ templ.SafeURL("/t/" + teamName + "/f/" + cell.FeatureName) }></a>
+		</td>
+	}
+}
+
+// heatmapCellClass builds the cell's class list — the "blocked" modifier
+// adds the red ring overlay; otherwise just the base present cell class.
+func heatmapCellClass(c *services.HeatmapCell) string {
+	if c.Counts.Blocked > 0 || c.Counts.Rejected > 0 {
+		return "heatmap-cell heatmap-cell-present heatmap-cell-blocked"
+	}
+	return "heatmap-cell heatmap-cell-present"
+}
+
+// heatmapCellFill returns a 0-1 string used as the CSS variable for
+// background opacity. Capped at 1.
+func heatmapCellFill(c *services.HeatmapCell) string {
+	if c.TotalRequirements <= 0 {
+		return "0.05"
+	}
+	pct := float64(c.Counts.Completed+c.Counts.Accepted) / float64(c.TotalRequirements)
+	if pct > 1 {
+		pct = 1
+	}
+	// Floor of 0.08 so even 0% cells read as "present" vs. "empty".
+	v := 0.08 + pct*0.55
+	return strconv.FormatFloat(v, 'f', 2, 64)
+}
+
+// heatmapCellTitle composes the hover tooltip — keeps the data dense view
+// glanceable without sacrificing exact counts on demand.
+func heatmapCellTitle(c *services.HeatmapCell) string {
+	done := c.Counts.Completed + c.Counts.Accepted
+	blocked := c.Counts.Blocked + c.Counts.Rejected
+	inflight := c.Counts.Assigned + c.Counts.Incomplete
+	pct := 0
+	if c.TotalRequirements > 0 {
+		pct = (done * 100) / c.TotalRequirements
+	}
+	parts := fmt.Sprintf("%s · %s — %d/%d done (%d%%)",
+		c.ProductName, c.FeatureName, done, c.TotalRequirements, pct)
+	if blocked > 0 {
+		parts += fmt.Sprintf(" · %d blocked", blocked)
+	}
+	if inflight > 0 {
+		parts += fmt.Sprintf(" · %d in progress", inflight)
+	}
+	return parts
 }

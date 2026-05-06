@@ -285,6 +285,130 @@ func (s *FeatureViewService) ResolveProductOverview(ctx context.Context, req Pro
 	return out, nil
 }
 
+// HeatmapCell is one (product, feature) intersection on the team heatmap.
+// Present=false marks cells where the product doesn't have a spec for the
+// feature — rendered as an empty slot, not "0% complete".
+type HeatmapCell struct {
+	ProductName       string
+	FeatureName       string
+	TotalRequirements int
+	Counts            StatusCounts
+	Present           bool
+}
+
+// HeatmapRow is one product's worth of cells, in the same column order as
+// TeamHeatmap.FeatureNames so the view can render a regular grid.
+type HeatmapRow struct {
+	ProductName    string
+	ProductTotal   int
+	ProductCounts  StatusCounts
+	ProductPresent bool // any cell in this row Present?
+	Cells          []*HeatmapCell
+}
+
+// TeamHeatmap is the data behind the team-overview heatmap: products as
+// rows, the union of all features across products as columns, and a
+// top-line aggregate that mirrors the impl/product banners.
+type TeamHeatmap struct {
+	FeatureNames    []string // sorted, used as columns
+	Rows            []*HeatmapRow
+	AggregateTotal  int
+	AggregateCounts StatusCounts
+	ImplCount       int
+}
+
+// TeamHeatmapRequest is the input to ResolveTeamHeatmap.
+type TeamHeatmapRequest struct {
+	TeamID string
+}
+
+// ResolveTeamHeatmap composes the team page's products × features grid by
+// reusing ResolveProductOverview per product and pivoting its per-feature
+// summaries into a column-aligned matrix.
+//
+// Cost: same as rendering each product page once. For the team-scope this
+// is the highest fan-out point in the app; if products × impls × features
+// grows, the obvious next move is a single roll-up SQL query keyed by
+// (product, feature).
+func (s *FeatureViewService) ResolveTeamHeatmap(ctx context.Context, req TeamHeatmapRequest) (*TeamHeatmap, error) {
+	prods, err := s.products.ListForTeam(ctx, req.TeamID)
+	if err != nil {
+		return nil, fmt.Errorf("services: ResolveTeamHeatmap: list products: %w", err)
+	}
+
+	type productView struct {
+		product  *products.Product
+		overview *ProductOverview
+	}
+	views := make([]productView, 0, len(prods))
+	featureSet := map[string]struct{}{}
+	implCount := 0
+	for _, p := range prods {
+		ov, err := s.ResolveProductOverview(ctx, ProductOverviewRequest{
+			TeamID:    req.TeamID,
+			ProductID: p.ID,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("services: ResolveTeamHeatmap: product %q: %w", p.Name, err)
+		}
+		views = append(views, productView{product: p, overview: ov})
+		implCount += len(ov.Impls)
+		for _, f := range ov.Features {
+			featureSet[f.FeatureName] = struct{}{}
+		}
+	}
+
+	featureNames := make([]string, 0, len(featureSet))
+	for name := range featureSet {
+		featureNames = append(featureNames, name)
+	}
+	sort.Strings(featureNames)
+
+	out := &TeamHeatmap{
+		FeatureNames: featureNames,
+		ImplCount:    implCount,
+	}
+
+	for _, pv := range views {
+		// Build a feature-name → ProductFeatureSummary map for O(1) lookup
+		// per column rather than re-walking the slice for each cell.
+		byName := make(map[string]*ProductFeatureSummary, len(pv.overview.Features))
+		for _, f := range pv.overview.Features {
+			byName[f.FeatureName] = f
+		}
+		row := &HeatmapRow{
+			ProductName:    pv.product.Name,
+			ProductTotal:   pv.overview.AggregateTotal,
+			ProductCounts:  pv.overview.AggregateCounts,
+			ProductPresent: len(pv.overview.Features) > 0,
+		}
+		for _, name := range featureNames {
+			cell := &HeatmapCell{ProductName: pv.product.Name, FeatureName: name}
+			if f, ok := byName[name]; ok {
+				cell.Present = true
+				cell.TotalRequirements = f.TotalRequirements
+				cell.Counts = f.Counts
+			}
+			row.Cells = append(row.Cells, cell)
+		}
+		out.Rows = append(out.Rows, row)
+
+		// Aggregate per cell so we don't double-count empty placeholders.
+		out.AggregateTotal += pv.overview.AggregateTotal
+		out.AggregateCounts.Null += pv.overview.AggregateCounts.Null
+		out.AggregateCounts.Assigned += pv.overview.AggregateCounts.Assigned
+		out.AggregateCounts.Blocked += pv.overview.AggregateCounts.Blocked
+		out.AggregateCounts.Incomplete += pv.overview.AggregateCounts.Incomplete
+		out.AggregateCounts.Completed += pv.overview.AggregateCounts.Completed
+		out.AggregateCounts.Rejected += pv.overview.AggregateCounts.Rejected
+		out.AggregateCounts.Accepted += pv.overview.AggregateCounts.Accepted
+	}
+
+	sort.Slice(out.Rows, func(i, j int) bool { return out.Rows[i].ProductName < out.Rows[j].ProductName })
+
+	return out, nil
+}
+
 // buildStatusCounts walks the states map and counts statuses, treating any
 // requirement without a state as "null".
 func buildStatusCounts(states *specs.FeatureImplState, totalReqs int) StatusCounts {
