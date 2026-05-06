@@ -11,6 +11,7 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/specs"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+	"github.com/jadams-positron/acai-sh-server/internal/services"
 	"github.com/jadams-positron/acai-sh-server/internal/site/views"
 )
 
@@ -21,6 +22,7 @@ type ProductShowDeps struct {
 	Products        *products.Repository
 	Implementations *implementations.Repository
 	Specs           *specs.Repository
+	FeatureView     *services.FeatureViewService
 }
 
 // ProductShow renders GET /t/:team_name/p/:product_name.
@@ -53,16 +55,15 @@ func ProductShow(d *ProductShowDeps) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load product")
 		}
 
-		impls, err := d.Implementations.ListByProduct(c.Request().Context(), team.ID, prod.ID)
+		// One service call composes both the per-impl summaries and the
+		// per-feature roll-ups by reusing ResolveImplOverview internally.
+		overview, err := d.FeatureView.ResolveProductOverview(c.Request().Context(), services.ProductOverviewRequest{
+			TeamID:    team.ID,
+			ProductID: prod.ID,
+		})
 		if err != nil {
-			d.Logger.Error("product show: list impls", "error", err)
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load impls")
-		}
-
-		featureNames, err := d.Specs.ListDistinctFeatureNamesForProduct(c.Request().Context(), prod.ID)
-		if err != nil {
-			d.Logger.Error("product show: list feature names", "error", err)
-			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load features")
+			d.Logger.Error("product show: ResolveProductOverview", "error", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load product overview")
 		}
 
 		shell, err := buildShellChrome(c, d.Teams, prod.Name+" · "+team.Name, team, "overview", []views.Crumb{
@@ -76,11 +77,10 @@ func ProductShow(d *ProductShowDeps) echo.HandlerFunc {
 		}
 		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 		return views.ProductShow(views.ProductShowProps{
-			Shell:           shell,
-			Team:            team,
-			Product:         prod,
-			Implementations: impls,
-			FeatureNames:    featureNames,
+			Shell:    shell,
+			Team:     team,
+			Product:  prod,
+			Overview: overview,
 		}).Render(c.Request().Context(), c.Response())
 	}
 }

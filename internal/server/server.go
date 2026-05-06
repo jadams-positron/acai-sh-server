@@ -99,15 +99,16 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Products: deps.Products,
 	}
 	site.MountTeamShowRoutes(browser, teamShowDeps, csrfMW)
+	featureViewSvc := services.NewFeatureViewService(deps.Products, deps.Implementations, deps.Specs)
 	productShowDeps := &handlers.ProductShowDeps{
 		Logger:          logger,
 		Teams:           deps.Teams,
 		Products:        deps.Products,
 		Implementations: deps.Implementations,
 		Specs:           deps.Specs,
+		FeatureView:     featureViewSvc,
 	}
 	site.MountProductShowRoutes(browser, productShowDeps, csrfMW)
-	featureViewSvc := services.NewFeatureViewService(deps.Products, deps.Implementations, deps.Specs)
 	featureShowDeps := &handlers.FeatureShowDeps{
 		Logger:      logger,
 		Teams:       deps.Teams,
