@@ -120,6 +120,20 @@ func (r *Repository) FirstTrackedBranch(ctx context.Context, implID string) (*Br
 	return branchFromRow(rows[0]), nil
 }
 
+// ListBranchesForTeam returns all branches in the team, newest-updated first.
+func (r *Repository) ListBranchesForTeam(ctx context.Context, teamID string) ([]*Branch, error) {
+	q := sqlc.New(r.db.Read)
+	rows, err := q.ListBranchesForTeam(ctx, teamID)
+	if err != nil {
+		return nil, fmt.Errorf("specs: ListBranchesForTeam: %w", err)
+	}
+	out := make([]*Branch, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, branchFromRow(row))
+	}
+	return out, nil
+}
+
 // ListSpecsForBranch returns all specs on the given branch ordered by feature_name.
 func (r *Repository) ListSpecsForBranch(ctx context.Context, branchID string) ([]*Spec, error) {
 	q := sqlc.New(r.db.Read)

@@ -1,0 +1,119 @@
+package views
+
+import (
+	"strings"
+
+	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/specs"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+)
+
+// BranchesIndexEntry is one row in the branches index — a branch and the
+// implementations tracking it.
+type BranchesIndexEntry struct {
+	Branch          *specs.Branch
+	Implementations []*implementations.Implementation
+}
+
+// BranchesIndexProps drives the /t/{team_name}/branches page.
+type BranchesIndexProps struct {
+	Shell    ShellProps
+	Team     *teams.Team
+	Branches []BranchesIndexEntry
+}
+
+templ BranchesIndex(p BranchesIndexProps) {
+	@Shell(p.Shell) {
+		<header class="page-header">
+			<h1 class="title">Branches</h1>
+			<p class="subtitle">Git branches that have pushed specs or refs to <strong>{ p.Team.Name }</strong>.</p>
+		</header>
+		if len(p.Branches) == 0 {
+			<div class="empty-state empty-state-rich">
+				<p class="empty-state-headline">No branches yet</p>
+				<p>Branches appear after the first <code>acai push</code> from a git repo. Each push records the branch you ran from, plus the latest commit it observed.</p>
+			</div>
+		} else {
+			<div class="panel" style="padding: 0;">
+				<table style="width: 100%; border-collapse: collapse;">
+					<thead>
+						<tr style="border-bottom: 1px solid var(--border-subtle); text-align: left;">
+							<th style="padding: var(--space-md);">Branch</th>
+							<th style="padding: var(--space-md);">Repo</th>
+							<th style="padding: var(--space-md);">Last commit</th>
+							<th style="padding: var(--space-md);">Tracked by</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, entry := range p.Branches {
+							@branchesIndexRow(p.Team.Name, entry)
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	}
+}
+
+templ branchesIndexRow(teamName string, e BranchesIndexEntry) {
+	<tr style="border-top: 1px solid var(--border-subtle);">
+		<td style="padding: var(--space-md); font-family: var(--font-mono); font-size: var(--text-sm);">
+			{ e.Branch.BranchName }
+		</td>
+		<td style="padding: var(--space-md); font-family: var(--font-mono); font-size: var(--text-sm); color: var(--muted);">
+			{ shortenRepoURI(e.Branch.RepoURI) }
+		</td>
+		<td style="padding: var(--space-md); font-family: var(--font-mono); font-size: var(--text-sm); color: var(--muted);">
+			if e.Branch.LastSeenCommit != "" {
+				{ shortCommit(e.Branch.LastSeenCommit) }
+			} else {
+				<span class="subtitle">—</span>
+			}
+		</td>
+		<td style="padding: var(--space-md);">
+			if len(e.Implementations) == 0 {
+				<span class="subtitle">untracked</span>
+			} else {
+				<div style="display: flex; flex-wrap: wrap; gap: var(--space-xs);">
+					for _, impl := range e.Implementations {
+						<a
+							class="badge"
+							style="text-decoration: none;"
+							href={ templ.SafeURL("/t/" + teamName + "/i/" + branchesImplSlug(impl)) }
+						>
+							{ impl.ProductName + " / " + impl.Name }
+						</a>
+					}
+				</div>
+			}
+		</td>
+	</tr>
+}
+
+// shortCommit truncates a git SHA to 7 chars for the table display.
+func shortCommit(sha string) string {
+	if len(sha) > 7 {
+		return sha[:7]
+	}
+	return sha
+}
+
+// shortenRepoURI strips the scheme prefix from common git URLs to keep the
+// table column readable. github.com/owner/repo and git@github.com:owner/repo
+// are both folded to "owner/repo".
+func shortenRepoURI(uri string) string {
+	if uri == "" {
+		return ""
+	}
+	for _, prefix := range []string{"https://github.com/", "git@github.com:"} {
+		if strings.HasPrefix(uri, prefix) {
+			return strings.TrimSuffix(strings.TrimPrefix(uri, prefix), ".git")
+		}
+	}
+	return uri
+}
+
+// branchesImplSlug mirrors services.ImplementationCard.ImplementationSlug.
+func branchesImplSlug(impl *implementations.Implementation) string {
+	return impl.Name + "-" + strings.ReplaceAll(impl.ID, "-", "")
+}

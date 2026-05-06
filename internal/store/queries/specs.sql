@@ -34,6 +34,12 @@ JOIN tracked_branches tb ON tb.branch_id = b.id
 WHERE tb.implementation_id = ?
 ORDER BY b.updated_at DESC;
 
+-- name: ListBranchesForTeam :many
+SELECT *
+FROM branches
+WHERE team_id = ?
+ORDER BY updated_at DESC;
+
 -- name: PickRefsBranchForFeature :one
 -- Of the impl's tracked branches, return the branch with the most-recent
 -- feature_branch_refs.pushed_at for the given feature_name. Used as the

@@ -73,6 +73,12 @@ func MountFeaturesIndexRoutes(g *echo.Group, deps *handlers.FeaturesIndexDeps, c
 	authd.GET("/t/:team_name/features", handlers.FeaturesIndex(deps))
 }
 
+// MountBranchesIndexRoutes registers the /t/:team_name/branches index route.
+func MountBranchesIndexRoutes(g *echo.Group, deps *handlers.BranchesIndexDeps, csrfMiddleware echo.MiddlewareFunc) {
+	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
+	authd.GET("/t/:team_name/branches", handlers.BranchesIndex(deps))
+}
+
 // MountImplShowRoutes registers the /t/:team_name/i/:impl_slug detail route.
 func MountImplShowRoutes(g *echo.Group, deps *handlers.ImplShowDeps, csrfMiddleware echo.MiddlewareFunc) {
 	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
