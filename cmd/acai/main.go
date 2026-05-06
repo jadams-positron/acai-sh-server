@@ -24,7 +24,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if len(args) < 2 {
 		_, _ = fmt.Fprintln(stdout, "usage: acai <subcommand>")
 		_, _ = fmt.Fprintln(stdout, "subcommands: serve, migrate, create-admin, healthcheck,")
-		_, _ = fmt.Fprintln(stdout, "             import-postgres, litestream, restore, version")
+		_, _ = fmt.Fprintln(stdout, "             litestream, restore, version")
 		return 2
 	}
 	switch args[1] {
@@ -39,8 +39,6 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return runCreateAdmin(ctx, args[2:], stdout, stderr)
 	case "healthcheck":
 		return runHealthcheck(ctx, stderr)
-	case "import-postgres":
-		return runImportPostgres(ctx, args[2:], stdout, stderr)
 	case "litestream":
 		return runLitestreamSubcommand(ctx, args[2:], stdout, stderr)
 	case "restore":
