@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/jadams-positron/acai-sh-server/internal/api/middleware"
+	"github.com/jadams-positron/acai-sh-server/internal/api/operations"
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/config"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/mail"
 	"github.com/jadams-positron/acai-sh-server/internal/ops"
 	"github.com/jadams-positron/acai-sh-server/internal/server"
@@ -37,6 +40,9 @@ func runServe(ctx context.Context, stderr io.Writer) int {
 	}
 
 	repo := accounts.NewRepository(db)
+	teamsRepo := teams.NewRepository(db)
+	opsCfg := operations.Load(cfg.URLScheme == "http") // non-prod when plain HTTP
+	apiLimiter := middleware.NewInProcessLimiter()
 	sessionManager := auth.NewSessionManager(db, cfg.URLScheme == "https")
 
 	baseURL := cfg.URLScheme + "://" + cfg.URLHost
@@ -65,6 +71,9 @@ func runServe(ctx context.Context, stderr io.Writer) int {
 		CSRFKey:         []byte(cfg.SecretKeyBase[:32]),
 		SecureCookie:    cfg.URLScheme == "https",
 		Version:         version,
+		Teams:           teamsRepo,
+		Operations:      opsCfg,
+		APILimiter:      apiLimiter,
 	})
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "server.New: %v\n", err)

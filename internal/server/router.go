@@ -4,6 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
+	"github.com/jadams-positron/acai-sh-server/internal/api"
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/ops"
 	"github.com/jadams-positron/acai-sh-server/internal/site"
@@ -30,6 +31,13 @@ func newRouter(deps *RouterDeps) chi.Router {
 
 	// Health check is outside the session middleware.
 	r.Method("GET", "/_health", ops.HealthHandler(deps.DB, deps.Version))
+
+	// API sub-router: bearer auth, size cap, rate limit, huma.
+	api.Mount(r, &api.Deps{
+		Teams:      deps.Teams,
+		Operations: deps.Operations,
+		Limiter:    deps.APILimiter,
+	})
 
 	return r
 }

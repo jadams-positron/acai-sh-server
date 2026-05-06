@@ -13,8 +13,11 @@ import (
 
 	"github.com/alexedwards/scs/v2"
 
+	apimiddleware "github.com/jadams-positron/acai-sh-server/internal/api/middleware"
+	"github.com/jadams-positron/acai-sh-server/internal/api/operations"
 	"github.com/jadams-positron/acai-sh-server/internal/config"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/site/handlers"
 	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
@@ -28,6 +31,9 @@ type RouterDeps struct {
 	CSRFKey         []byte
 	SecureCookie    bool
 	Version         string
+	Teams           *teams.Repository
+	Operations      *operations.Config
+	APILimiter      apimiddleware.Limiter
 }
 
 // Server is the HTTP server bundle.
