@@ -15,6 +15,8 @@ package apierror
 import (
 	"encoding/json"
 	"net/http"
+
+	"github.com/labstack/echo/v4"
 )
 
 // AppError is the single-object error envelope.
@@ -48,6 +50,24 @@ func WriteValidationError(w http.ResponseWriter, code int, items []ValidationErr
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
 	_ = json.NewEncoder(w).Encode(map[string]any{
+		"errors": items,
+	})
+}
+
+// WriteAppErrorEcho is the echo-friendly variant. Returns nil because echo's
+// HandlerFunc expects a returned error (or nil if response was written).
+func WriteAppErrorEcho(c echo.Context, code int, detail, status string) error {
+	if status == "" {
+		status = StatusFromCode(code)
+	}
+	return c.JSON(code, map[string]any{
+		"errors": AppError{Detail: detail, Status: status},
+	})
+}
+
+// WriteValidationErrorEcho is the echo-friendly variant.
+func WriteValidationErrorEcho(c echo.Context, code int, items []ValidationError) error {
+	return c.JSON(code, map[string]any{
 		"errors": items,
 	})
 }

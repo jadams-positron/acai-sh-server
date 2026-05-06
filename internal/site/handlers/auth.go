@@ -5,8 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/alexedwards/scs/v2"
-	"github.com/gorilla/csrf"
+	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
@@ -17,7 +16,7 @@ import (
 // AuthDeps groups the dependencies the auth handlers need.
 type AuthDeps struct {
 	Logger    *slog.Logger
-	Sessions  *scs.SessionManager
+	Sessions  *auth.SessionStore
 	Accounts  *accounts.Repository
 	MagicLink *auth.MagicLinkService
 	Mailer    mail.Mailer
@@ -25,31 +24,37 @@ type AuthDeps struct {
 	FromName  string
 }
 
+// csrfTokenFromEcho returns the CSRF token that echo's CSRF middleware injected.
+func csrfTokenFromEcho(c echo.Context) string {
+	if tok, ok := c.Get("csrf").(string); ok {
+		return tok
+	}
+	return ""
+}
+
 // LoginNew GETs the login form.
-func LoginNew(_ *AuthDeps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = views.LoginPage(views.LoginPageProps{CSRFToken: csrf.Token(r)}).Render(r.Context(), w)
+func LoginNew(_ *AuthDeps) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+		return views.LoginPage(views.LoginPageProps{
+			CSRFToken: csrfTokenFromEcho(c),
+		}).Render(c.Request().Context(), c.Response())
 	}
 }
 
 // LoginCreate POSTs the login form: looks up user by email, generates a
 // magic-link, sends via mailer, then renders the "check your email" page.
 // Always returns the same response regardless of email existence.
-func LoginCreate(d *AuthDeps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, "bad request", http.StatusBadRequest)
-			return
-		}
-		email := r.PostForm.Get("email")
+func LoginCreate(d *AuthDeps) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		email := c.FormValue("email")
 
-		user, err := d.Accounts.GetUserByEmail(r.Context(), email)
+		user, err := d.Accounts.GetUserByEmail(c.Request().Context(), email)
 		switch {
 		case err == nil:
-			url, _, genErr := d.MagicLink.GenerateLoginURL(r.Context(), user)
+			url, _, genErr := d.MagicLink.GenerateLoginURL(c.Request().Context(), user)
 			if genErr == nil {
-				_ = d.Mailer.SendMagicLink(r.Context(), mail.MagicLinkArgs{
+				_ = d.Mailer.SendMagicLink(c.Request().Context(), mail.MagicLinkArgs{
 					To:        user.Email,
 					URL:       url,
 					FromEmail: d.FromEmail,
@@ -64,77 +69,68 @@ func LoginCreate(d *AuthDeps) http.HandlerFunc {
 			d.Logger.Warn("login: lookup user", "error", err)
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = views.LoginRequestedPage(views.LoginRequestedProps{Email: email}).Render(r.Context(), w)
+		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+		return views.LoginRequestedPage(views.LoginRequestedProps{Email: email}).Render(c.Request().Context(), c.Response())
 	}
 }
 
 // LoginConfirm consumes a magic-link token, marks confirmed, installs session.
-func LoginConfirm(d *AuthDeps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		token := r.PathValue("token")
+func LoginConfirm(d *AuthDeps) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		token := c.Param("token")
 		if token == "" {
-			http.Error(w, "missing token", http.StatusBadRequest)
-			return
+			return echo.NewHTTPError(http.StatusBadRequest, "missing token")
 		}
-		user, err := d.MagicLink.ConsumeLoginToken(r.Context(), token)
+		user, err := d.MagicLink.ConsumeLoginToken(c.Request().Context(), token)
 		if err != nil {
 			d.Logger.Info("login: consume token failed", "error", err)
-			renderLoginWithFlash(w, r, "That magic link is invalid or expired. Please request a new one.")
-			return
+			return renderLoginWithFlash(c, d, "That magic link is invalid or expired. Please request a new one.")
 		}
 
-		if err := d.Accounts.MarkConfirmed(r.Context(), user.ID); err != nil {
+		if err := d.Accounts.MarkConfirmed(c.Request().Context(), user.ID); err != nil {
 			d.Logger.Warn("login: mark confirmed", "error", err)
 		}
 
-		if err := d.Sessions.RenewToken(r.Context()); err != nil {
-			d.Logger.Warn("login: renew token", "error", err)
+		if err := d.Sessions.Login(c, user.ID); err != nil {
+			d.Logger.Warn("login: save session", "error", err)
 		}
-
-		auth.Login(r.Context(), d.Sessions, user.ID)
-		http.Redirect(w, r, "/teams", http.StatusSeeOther)
+		return c.Redirect(http.StatusSeeOther, "/teams")
 	}
 }
 
 // LogOut destroys the session.
-func LogOut(d *AuthDeps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if err := auth.Logout(r.Context(), d.Sessions); err != nil {
-			d.Logger.Warn("logout: destroy session", "error", err)
-		}
-		http.Redirect(w, r, "/users/log-in", http.StatusSeeOther)
+func LogOut(d *AuthDeps) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		_ = d.Sessions.Logout(c)
+		return c.Redirect(http.StatusSeeOther, "/users/log-in")
 	}
 }
 
 // RegisterNew GETs the sign-up form.
-func RegisterNew(_ *AuthDeps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = views.RegisterPage(views.RegisterPageProps{CSRFToken: csrf.Token(r)}).Render(r.Context(), w)
+func RegisterNew(_ *AuthDeps) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+		return views.RegisterPage(views.RegisterPageProps{
+			CSRFToken: csrfTokenFromEcho(c),
+		}).Render(c.Request().Context(), c.Response())
 	}
 }
 
 // RegisterCreate POSTs the form: creates a new user (with NULL password) if
 // not already present, then sends a magic-link. Always renders success page.
-func RegisterCreate(d *AuthDeps) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if err := r.ParseForm(); err != nil {
-			http.Error(w, "bad request", http.StatusBadRequest)
-			return
-		}
-		email := r.PostForm.Get("email")
+func RegisterCreate(d *AuthDeps) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		email := c.FormValue("email")
 		if email == "" {
-			renderRegisterWithFlash(w, r, "Email is required.")
-			return
+			return renderRegisterWithFlash(c, d, "Email is required.")
 		}
 
-		user, err := d.Accounts.GetUserByEmail(r.Context(), email)
+		user, err := d.Accounts.GetUserByEmail(c.Request().Context(), email)
 		switch {
 		case err == nil:
 			// already exists — re-send a login link
 		case accounts.IsNotFound(err):
-			user, err = d.Accounts.CreateUser(r.Context(), accounts.CreateUserParams{
+			user, err = d.Accounts.CreateUser(c.Request().Context(), accounts.CreateUserParams{
 				Email:          email,
 				HashedPassword: "",
 			})
@@ -146,9 +142,9 @@ func RegisterCreate(d *AuthDeps) http.HandlerFunc {
 		}
 
 		if user != nil {
-			url, _, genErr := d.MagicLink.GenerateLoginURL(r.Context(), user)
+			url, _, genErr := d.MagicLink.GenerateLoginURL(c.Request().Context(), user)
 			if genErr == nil {
-				_ = d.Mailer.SendMagicLink(r.Context(), mail.MagicLinkArgs{
+				_ = d.Mailer.SendMagicLink(c.Request().Context(), mail.MagicLinkArgs{
 					To:        user.Email,
 					URL:       url,
 					FromEmail: d.FromEmail,
@@ -159,25 +155,23 @@ func RegisterCreate(d *AuthDeps) http.HandlerFunc {
 			}
 		}
 
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = views.RegisterRequestedPage(views.RegisterRequestedProps{Email: email}).Render(r.Context(), w)
+		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+		return views.RegisterRequestedPage(views.RegisterRequestedProps{Email: email}).Render(c.Request().Context(), c.Response())
 	}
 }
 
-func renderLoginWithFlash(w http.ResponseWriter, r *http.Request, flash string) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	_ = views.LoginPage(views.LoginPageProps{
+func renderLoginWithFlash(c echo.Context, d *AuthDeps, flash string) error {
+	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+	return views.LoginPage(views.LoginPageProps{
 		Flash:     flash,
-		CSRFToken: csrf.Token(r),
-	}).Render(r.Context(), w)
+		CSRFToken: csrfTokenFromEcho(c),
+	}).Render(c.Request().Context(), c.Response())
 }
 
-func renderRegisterWithFlash(w http.ResponseWriter, r *http.Request, flash string) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	_ = views.RegisterPage(views.RegisterPageProps{
+func renderRegisterWithFlash(c echo.Context, d *AuthDeps, flash string) error {
+	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+	return views.RegisterPage(views.RegisterPageProps{
 		Flash:     flash,
-		CSRFToken: csrf.Token(r),
-	}).Render(r.Context(), w)
+		CSRFToken: csrfTokenFromEcho(c),
+	}).Render(c.Request().Context(), c.Response())
 }

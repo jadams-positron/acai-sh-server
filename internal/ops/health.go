@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/labstack/echo/v4"
+
 	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
@@ -37,4 +39,19 @@ func HealthHandler(db *store.DB, version string) http.Handler {
 		w.WriteHeader(code)
 		_ = json.NewEncoder(w).Encode(resp)
 	})
+}
+
+// HealthHandlerEcho returns an echo.HandlerFunc that checks DB reachability.
+func HealthHandlerEcho(db *store.DB, version string) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		body := map[string]string{"status": "ok", "db": "ok", "version": version}
+		code := http.StatusOK
+		if err := db.Read.PingContext(c.Request().Context()); err != nil {
+			body["status"] = "degraded"
+			body["db"] = "error"
+			body["error"] = err.Error()
+			code = http.StatusServiceUnavailable
+		}
+		return c.JSON(code, body)
+	}
 }

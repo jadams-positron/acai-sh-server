@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/labstack/echo/v4"
+
 	"github.com/jadams-positron/acai-sh-server/internal/api/middleware"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
@@ -49,23 +51,25 @@ func setup(t *testing.T) (repo *teams.Repository, plaintext string) {
 
 func runBearer(t *testing.T, repo *teams.Repository, header string) (rec *httptest.ResponseRecorder, called bool) {
 	t.Helper()
-	mw := middleware.BearerAuth(repo)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	e := echo.New()
+	e.Use(middleware.BearerAuth(repo))
+	e.GET("/api/v1/x", func(c echo.Context) error {
 		called = true
-		if middleware.TokenFrom(r.Context()) == nil {
-			t.Errorf("downstream: TokenFrom returned nil")
+		if middleware.TokenFromEcho(c) == nil {
+			t.Errorf("downstream: TokenFromEcho returned nil")
 		}
-		if middleware.TeamFrom(r.Context()) == nil {
-			t.Errorf("downstream: TeamFrom returned nil")
+		if middleware.TeamFromEcho(c) == nil {
+			t.Errorf("downstream: TeamFromEcho returned nil")
 		}
-		w.WriteHeader(http.StatusOK)
-	}))
+		return c.NoContent(http.StatusOK)
+	})
 
-	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/x", http.NoBody)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/x", http.NoBody)
 	if header != "" {
 		req.Header.Set("Authorization", header)
 	}
 	rec = httptest.NewRecorder()
-	mw.ServeHTTP(rec, req)
+	e.ServeHTTP(rec, req)
 	return rec, called
 }
 

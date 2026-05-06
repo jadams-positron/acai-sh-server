@@ -1,11 +1,12 @@
 package middleware_test
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/api/middleware"
 )
@@ -68,15 +69,16 @@ func TestRateLimit_Middleware_429OnExceeded(t *testing.T) {
 	limiter := middleware.NewInProcessLimiter()
 	spec := middleware.RateLimitSpec{Requests: 1, WindowSeconds: 60}
 
-	mw := middleware.RateLimit(func(string) middleware.RateLimitSpec { return spec }, limiter)
-	handler := mw(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+	e := echo.New()
+	e.Use(middleware.RateLimit(func(string) middleware.RateLimitSpec { return spec }, limiter))
+	e.GET("/x", func(c echo.Context) error {
+		return c.NoContent(http.StatusOK)
+	})
 
 	doRequest := func() int {
-		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/x", http.NoBody)
+		req := httptest.NewRequest(http.MethodGet, "/x", http.NoBody)
 		rec := httptest.NewRecorder()
-		handler.ServeHTTP(rec, req)
+		e.ServeHTTP(rec, req)
 		return rec.Code
 	}
 

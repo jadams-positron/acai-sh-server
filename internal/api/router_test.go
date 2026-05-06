@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/api"
 	"github.com/jadams-positron/acai-sh-server/internal/api/middleware"
@@ -17,7 +17,7 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/store"
 )
 
-func setupAPI(t *testing.T) chi.Router {
+func setupAPI(t *testing.T) *echo.Echo {
 	t.Helper()
 	dir := t.TempDir()
 	db, err := store.Open(filepath.Join(dir, "test.db"))
@@ -29,21 +29,21 @@ func setupAPI(t *testing.T) chi.Router {
 		t.Fatalf("RunMigrations: %v", err)
 	}
 
-	r := chi.NewRouter()
-	api.Mount(r, &api.Deps{
+	e := echo.New()
+	api.Mount(e, &api.Deps{
 		Teams:      teams.NewRepository(db),
 		Operations: operations.Load(true),
 		Limiter:    middleware.NewInProcessLimiter(),
 	})
-	return r
+	return e
 }
 
 func TestMount_OpenAPIJSONPublicAndValid(t *testing.T) {
-	r := setupAPI(t)
+	e := setupAPI(t)
 
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/openapi.json", http.NoBody)
 	rec := httptest.NewRecorder()
-	r.ServeHTTP(rec, req)
+	e.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
@@ -58,5 +58,17 @@ func TestMount_OpenAPIJSONPublicAndValid(t *testing.T) {
 	}
 	if doc["info"] == nil {
 		t.Errorf("info key missing in response")
+	}
+}
+
+func TestMount_AuthedEndpoint_NoAuth_Returns401(t *testing.T) {
+	e := setupAPI(t)
+
+	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, "/api/v1/implementations", http.NoBody)
+	rec := httptest.NewRecorder()
+	e.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401; body=%s", rec.Code, rec.Body.String())
 	}
 }

@@ -2,67 +2,51 @@
 package site
 
 import (
-	"net/http"
-
-	"github.com/go-chi/chi/v5"
-	"github.com/gorilla/csrf"
+	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/site/handlers"
 	"github.com/jadams-positron/acai-sh-server/internal/site/views"
 )
 
-// MountAuthRoutes registers the login/logout routes on r. Caller is expected
-// to have mounted sessionManager.LoadAndSave + auth.LoadScope at the parent.
+// csrfTokenFromEcho returns the CSRF token echo's middleware injected.
+func csrfTokenFromEcho(c echo.Context) string {
+	if tok, ok := c.Get("csrf").(string); ok {
+		return tok
+	}
+	return ""
+}
+
+// MountAuthRoutes registers the login/logout routes on the group. Caller is
+// expected to have mounted auth.LoadScope at the parent group level.
 //
 // CSRF is applied on the auth subtree (everywhere except the magic-link
 // confirm GET, where the token IS the auth proof).
-func MountAuthRoutes(r chi.Router, deps *handlers.AuthDeps, csrfKey []byte, secureCookie bool) {
-	csrfMiddleware := csrf.Protect(csrfKey,
-		csrf.Secure(secureCookie),
-		csrf.Path("/"),
-		csrf.SameSite(csrf.SameSiteLaxMode),
-	)
-
+func MountAuthRoutes(g *echo.Group, deps *handlers.AuthDeps, csrfMiddleware echo.MiddlewareFunc) {
 	// Routes for unauthenticated users only.
-	r.Group(func(r chi.Router) {
-		r.Use(csrfMiddleware)
-		r.Use(auth.RedirectIfAuth)
-		r.Get("/users/log-in", handlers.LoginNew(deps))
-		r.Post("/users/log-in", handlers.LoginCreate(deps))
-		r.Get("/users/register", handlers.RegisterNew(deps))
-		r.Post("/users/register", handlers.RegisterCreate(deps))
-	})
+	unauth := g.Group("", csrfMiddleware, auth.RedirectIfAuth)
+	unauth.GET("/users/log-in", handlers.LoginNew(deps))
+	unauth.POST("/users/log-in", handlers.LoginCreate(deps))
+	unauth.GET("/users/register", handlers.RegisterNew(deps))
+	unauth.POST("/users/register", handlers.RegisterCreate(deps))
 
-	// Magic-link consume — bypasses CSRF.
-	r.Get("/users/log-in/{token}", handlers.LoginConfirm(deps))
+	// Magic-link consume — bypasses CSRF (token IS the proof).
+	g.GET("/users/log-in/:token", handlers.LoginConfirm(deps))
 
-	// Logout always allowed.
-	r.Group(func(r chi.Router) {
-		r.Use(csrfMiddleware)
-		r.Post("/users/log-out", handlers.LogOut(deps))
-	})
+	// Logout (CSRF protected).
+	logout := g.Group("", csrfMiddleware)
+	logout.POST("/users/log-out", handlers.LogOut(deps))
 }
 
-// MountAuthRequiredStub mounts /teams as a P1d proof-of-life endpoint. /teams
-// is wrapped with CSRF middleware so the embedded logout form's token is
-// valid; the route still requires auth.
-func MountAuthRequiredStub(r chi.Router, csrfKey []byte, secureCookie bool) {
-	csrfMiddleware := csrf.Protect(csrfKey,
-		csrf.Secure(secureCookie),
-		csrf.Path("/"),
-		csrf.SameSite(csrf.SameSiteLaxMode),
-	)
-	r.Group(func(r chi.Router) {
-		r.Use(csrfMiddleware)
-		r.Use(auth.RequireAuth)
-		r.Get("/teams", func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			s := auth.ScopeFrom(r.Context())
-			_ = views.TeamsStub(views.TeamsStubProps{
-				UserEmail: s.User.Email,
-				CSRFToken: csrf.Token(r),
-			}).Render(r.Context(), w)
-		})
+// MountAuthRequiredStub mounts /teams as a P1d proof-of-life endpoint.
+func MountAuthRequiredStub(g *echo.Group, csrfMiddleware echo.MiddlewareFunc) {
+	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
+	authd.GET("/teams", func(c echo.Context) error {
+		s := auth.ScopeFromEcho(c)
+		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+		return views.TeamsStub(views.TeamsStubProps{
+			UserEmail: s.User.Email,
+			CSRFToken: csrfTokenFromEcho(c),
+		}).Render(c.Request().Context(), c.Response())
 	})
 }

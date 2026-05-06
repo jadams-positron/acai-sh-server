@@ -6,15 +6,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/site/handlers"
 )
 
 func TestMountStatic_ServesDatastarJS(t *testing.T) {
-	r := chi.NewRouter()
-	handlers.MountStatic(r)
-	ts := httptest.NewServer(r)
+	e := echo.New()
+	handlers.MountStatic(e.Group(""))
+	ts := httptest.NewServer(e)
 	defer ts.Close()
 
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/_assets/js/datastar.min.js", http.NoBody)
@@ -33,9 +33,9 @@ func TestMountStatic_ServesDatastarJS(t *testing.T) {
 }
 
 func TestMountStatic_404OnMissingAsset(t *testing.T) {
-	r := chi.NewRouter()
-	handlers.MountStatic(r)
-	ts := httptest.NewServer(r)
+	e := echo.New()
+	handlers.MountStatic(e.Group(""))
+	ts := httptest.NewServer(e)
 	defer ts.Close()
 
 	req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+"/_assets/js/nonexistent.js", http.NoBody)

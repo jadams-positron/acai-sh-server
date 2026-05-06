@@ -3,64 +3,58 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"strings"
+
+	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/api/apierror"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 )
 
-type ctxKey struct{ name string }
-
-var (
-	tokenCtxKey = ctxKey{"api.token"}
-	teamCtxKey  = ctxKey{"api.team"}
+const (
+	tokenKey = "api.token"
+	teamKey  = "api.team"
 )
 
-// TokenFrom returns the *teams.AccessToken attached to ctx, or nil.
-func TokenFrom(ctx context.Context) *teams.AccessToken {
-	t, _ := ctx.Value(tokenCtxKey).(*teams.AccessToken)
+// TokenFromEcho returns the *teams.AccessToken attached to c, or nil.
+func TokenFromEcho(c echo.Context) *teams.AccessToken {
+	t, _ := c.Get(tokenKey).(*teams.AccessToken)
 	return t
 }
 
-// TeamFrom returns the *teams.Team attached to ctx, or nil.
-func TeamFrom(ctx context.Context) *teams.Team {
-	t, _ := ctx.Value(teamCtxKey).(*teams.Team)
+// TeamFromEcho returns the *teams.Team attached to c, or nil.
+func TeamFromEcho(c echo.Context) *teams.Team {
+	t, _ := c.Get(teamKey).(*teams.Team)
 	return t
 }
 
-// BearerAuth reads the Authorization header, validates the bearer token via
-// repo.VerifyAccessToken, and attaches *AccessToken + *Team to the request
-// context. On any failure: 401 with the standard app-error envelope.
-func BearerAuth(repo *teams.Repository) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			rawHeader := r.Header.Get("Authorization")
+// BearerAuth reads Authorization, validates the bearer token, attaches
+// *AccessToken + *Team to the echo context.
+func BearerAuth(repo *teams.Repository) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			rawHeader := c.Request().Header.Get("Authorization")
 			if rawHeader == "" {
-				apierror.WriteAppError(w, http.StatusUnauthorized, "Authorization header required", "")
-				return
+				return apierror.WriteAppErrorEcho(c, http.StatusUnauthorized, "Authorization header required", "")
 			}
 			const prefix = "Bearer "
 			if !strings.HasPrefix(rawHeader, prefix) {
-				apierror.WriteAppError(w, http.StatusUnauthorized, "Authorization header must use Bearer scheme", "")
-				return
+				return apierror.WriteAppErrorEcho(c, http.StatusUnauthorized, "Authorization header must use Bearer scheme", "")
 			}
 			plaintext := strings.TrimSpace(strings.TrimPrefix(rawHeader, prefix))
 			if plaintext == "" {
-				apierror.WriteAppError(w, http.StatusUnauthorized, "Invalid or missing bearer token", "")
-				return
+				return apierror.WriteAppErrorEcho(c, http.StatusUnauthorized, "Invalid or missing bearer token", "")
 			}
 
-			token, team, err := repo.VerifyAccessToken(r.Context(), plaintext)
+			token, team, err := repo.VerifyAccessToken(c.Request().Context(), plaintext)
 			if err != nil {
-				apierror.WriteAppError(w, http.StatusUnauthorized, "Invalid or expired bearer token", "")
-				return
+				return apierror.WriteAppErrorEcho(c, http.StatusUnauthorized, "Invalid or expired bearer token", "")
 			}
 
-			ctx := context.WithValue(r.Context(), tokenCtxKey, token)
-			ctx = context.WithValue(ctx, teamCtxKey, team)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
+			c.Set(tokenKey, token)
+			c.Set(teamKey, team)
+			return next(c)
+		}
 	}
 }

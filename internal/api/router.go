@@ -1,17 +1,32 @@
 // Package api owns the /api/v1 sub-router: bearer auth, size cap, rate limit,
-// and operation registration via huma. P2a stands up the scaffold; P2b/P2c add
-// individual operations.
+// and operation registration via oapi-codegen generated ServerInterface.
 package api
 
 import (
-	"github.com/danielgtaylor/huma/v2"
-	"github.com/danielgtaylor/huma/v2/adapters/humachi"
-	"github.com/go-chi/chi/v5"
+	"encoding/json"
+	"net/http"
+
+	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/api/middleware"
 	"github.com/jadams-positron/acai-sh-server/internal/api/operations"
+	"github.com/jadams-positron/acai-sh-server/internal/api/spec"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 )
+
+// openapiJSON is the canonical OpenAPI spec. It is decoded from the embedded
+// gzipped+base64 data in spec.gen.go and re-serialized at init time.
+var openapiJSON = func() []byte {
+	swagger, err := spec.GetSwagger()
+	if err != nil {
+		panic("api: spec.GetSwagger: " + err.Error())
+	}
+	b, err := json.Marshal(swagger)
+	if err != nil {
+		panic("api: marshal swagger: " + err.Error())
+	}
+	return b
+}()
 
 // Deps groups the dependencies the api sub-router needs.
 type Deps struct {
@@ -20,67 +35,48 @@ type Deps struct {
 	Limiter    middleware.Limiter
 }
 
-// applySecurityScheme patches an existing huma.Config's OpenAPI spec with the
-// bearer auth security scheme and server URL. Safe to call after DefaultConfig.
-func applySecurityScheme(cfg *huma.Config) {
-	cfg.Servers = []*huma.Server{{URL: "/api/v1", Description: "API v1"}}
-	if cfg.Components == nil {
-		cfg.Components = &huma.Components{}
-	}
-	cfg.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
-		"bearerAuth": {Type: "http", Scheme: "bearer", BearerFormat: "API token"},
-	}
-	cfg.Security = []map[string][]string{{"bearerAuth": {}}}
-}
+// Mount registers /api/v1/* routes on the parent echo. Public:
+// /api/v1/openapi.json. Authed: bearer + size-cap + rate-limit, then the
+// generated ServerInterface routes (501 stubs in P2a).
+func Mount(parent *echo.Echo, deps *Deps) {
+	v1 := parent.Group("/api/v1")
 
-// publicHumaConfig builds the OpenAPI 3.1 config for the public spec group
-// (serves /openapi.json, no docs UI, no auth middleware).
-func publicHumaConfig() huma.Config {
-	cfg := huma.DefaultConfig("Acai API", "1.0.0")
-	applySecurityScheme(&cfg)
-	cfg.OpenAPIPath = "/openapi" // huma appends .json → serves /openapi.json
-	cfg.DocsPath = ""            // suppress huma's bundled docs UI
-	return cfg
-}
-
-// authedHumaConfig builds the OpenAPI 3.1 config for the auth'd huma instance.
-// Spec serving is disabled here to avoid registering duplicate routes with the
-// public group; the public /openapi.json is the canonical spec endpoint.
-func authedHumaConfig() huma.Config {
-	cfg := huma.DefaultConfig("Acai API", "1.0.0")
-	applySecurityScheme(&cfg)
-	cfg.OpenAPIPath = "" // no spec routes on the auth'd adapter
-	cfg.DocsPath = ""    // suppress huma's bundled docs UI
-	return cfg
-}
-
-// Mount registers the /api/v1/* routes on parent. P2a wires only the public
-// /openapi.json + the auth'd middleware stack; P2b/P2c register operations.
-//
-// Returns the auth'd huma.API so subsequent phases can register operations.
-func Mount(parent chi.Router, deps *Deps) huma.API {
-	var authedAPI huma.API
-
-	parent.Route("/api/v1", func(r chi.Router) {
-		// Public openapi.json — no auth. Uses publicHumaConfig which enables
-		// spec serving; humachi registers /openapi.json on this group's router
-		// which chi maps to GET /api/v1/openapi.json from the outer perspective.
-		r.Group(func(r chi.Router) {
-			pubAPI := humachi.New(r, publicHumaConfig())
-			_ = pubAPI // operations registered later in P2b/P2c
-		})
-
-		// Authenticated group: bearer + size cap + rate limit, then huma.
-		// Uses authedHumaConfig (no spec routes) to avoid duplicate-route
-		// conflicts with the public group above.
-		r.Group(func(r chi.Router) {
-			r.Use(middleware.BearerAuth(deps.Teams))
-			r.Use(middleware.SizeCap(deps.Operations.SizeCapForPath))
-			r.Use(middleware.RateLimit(deps.Operations.RateLimitForPath, deps.Limiter))
-
-			authedAPI = humachi.New(r, authedHumaConfig())
-		})
+	// Public openapi.json — serve the embedded source-of-truth spec verbatim.
+	v1.GET("/openapi.json", func(c echo.Context) error {
+		return c.Blob(http.StatusOK, "application/json", openapiJSON)
 	})
 
-	return authedAPI
+	// Authenticated group.
+	authd := v1.Group("",
+		middleware.BearerAuth(deps.Teams),
+		middleware.SizeCap(deps.Operations.SizeCapForPath),
+		middleware.RateLimit(deps.Operations.RateLimitForPath, deps.Limiter),
+	)
+
+	// Register the generated ServerInterface using a stub server.
+	// In P2b/P2c, the real Server implementation replaces unimplementedServer.
+	spec.RegisterHandlers(authd, &unimplementedServer{})
+}
+
+// unimplementedServer satisfies spec.ServerInterface with 501 stubs.
+type unimplementedServer struct{}
+
+func (unimplementedServer) AcaiWebApiFeatureContextControllerShow(c echo.Context, _ spec.AcaiWebApiFeatureContextControllerShowParams) error {
+	return echo.NewHTTPError(http.StatusNotImplemented, "feature-context not implemented yet (P2b)")
+}
+
+func (unimplementedServer) AcaiWebApiFeatureStatesControllerUpdate(c echo.Context) error {
+	return echo.NewHTTPError(http.StatusNotImplemented, "feature-states not implemented yet (P2c)")
+}
+
+func (unimplementedServer) AcaiWebApiImplementationFeaturesControllerIndex(c echo.Context, _ spec.AcaiWebApiImplementationFeaturesControllerIndexParams) error {
+	return echo.NewHTTPError(http.StatusNotImplemented, "implementation-features not implemented yet (P2b)")
+}
+
+func (unimplementedServer) AcaiWebApiImplementationsControllerIndex(c echo.Context, _ spec.AcaiWebApiImplementationsControllerIndexParams) error {
+	return echo.NewHTTPError(http.StatusNotImplemented, "implementations not implemented yet (P2b)")
+}
+
+func (unimplementedServer) AcaiWebApiPushControllerCreate(c echo.Context) error {
+	return echo.NewHTTPError(http.StatusNotImplemented, "push not implemented yet (P2c)")
 }

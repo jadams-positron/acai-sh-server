@@ -3,51 +3,59 @@ package auth
 import (
 	"net/http"
 
-	"github.com/alexedwards/scs/v2"
+	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
 )
 
-// LoadScope reads user_id from the session, fetches the user, and stores a
-// *Scope on the request context. Anonymous requests get an empty Scope.
-func LoadScope(mgr *scs.SessionManager, repo *accounts.Repository) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := r.Context()
-			scope := &Scope{}
+const (
+	scopeKey = "acai.scope"
+)
 
-			if userID := mgr.GetString(ctx, sessionKeyUserID); userID != "" {
-				user, err := repo.GetUserByID(ctx, userID)
+// LoadScope reads user_id from the session, fetches the user, and stores a
+// *Scope on the echo context. Anonymous requests get an empty Scope.
+func LoadScope(store *SessionStore, repo *accounts.Repository) echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			scope := &Scope{}
+			if userID := store.CurrentUserID(c); userID != "" {
+				user, err := repo.GetUserByID(c.Request().Context(), userID)
 				if err == nil {
 					scope.User = user
 				} else if accounts.IsNotFound(err) {
-					_ = mgr.Destroy(ctx)
+					_ = store.Logout(c)
 				}
 			}
-
-			next.ServeHTTP(w, r.WithContext(WithScope(ctx, scope)))
-		})
+			c.Set(scopeKey, scope)
+			return next(c)
+		}
 	}
 }
 
-// RequireAuth redirects unauthenticated requests to /users/log-in.
-func RequireAuth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !ScopeFrom(r.Context()).IsAuthenticated() {
-			http.Redirect(w, r, "/users/log-in", http.StatusSeeOther)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+// ScopeFromEcho returns the scope from the echo context.
+func ScopeFromEcho(c echo.Context) *Scope {
+	if s, ok := c.Get(scopeKey).(*Scope); ok && s != nil {
+		return s
+	}
+	return &Scope{}
 }
 
-// RedirectIfAuth redirects authenticated requests to /teams. Use on the login page.
-func RedirectIfAuth(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if ScopeFrom(r.Context()).IsAuthenticated() {
-			http.Redirect(w, r, "/teams", http.StatusSeeOther)
-			return
+// RequireAuth redirects unauthenticated requests to /users/log-in.
+func RequireAuth(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if !ScopeFromEcho(c).IsAuthenticated() {
+			return c.Redirect(http.StatusSeeOther, "/users/log-in")
 		}
-		next.ServeHTTP(w, r)
-	})
+		return next(c)
+	}
+}
+
+// RedirectIfAuth redirects authenticated requests to /teams.
+func RedirectIfAuth(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if ScopeFromEcho(c).IsAuthenticated() {
+			return c.Redirect(http.StatusSeeOther, "/teams")
+		}
+		return next(c)
+	}
 }
