@@ -1,0 +1,34 @@
+# infra/Dockerfile.dev — development container for the Acai Go rewrite.
+# Provides a fully-equipped Go environment with code-gen tools and just.
+# Source is mounted at /app at runtime; no binary is baked in.
+
+FROM golang:1.26-bookworm
+
+RUN useradd -ms /bin/bash dev
+
+# Install just (task runner) via prebuilt binary for the container arch.
+# If the download fails (e.g. in a restricted network) the image still builds;
+# developers can run `just install-tools` manually or use `go run` directly.
+RUN ARCH=$(dpkg --print-architecture) \
+ && JUST_VERSION=1.40.0 \
+ && case "$ARCH" in \
+      amd64) JUST_TRIPLE="x86_64-unknown-linux-musl" ;; \
+      arm64) JUST_TRIPLE="aarch64-unknown-linux-musl" ;; \
+      *) JUST_TRIPLE="" ;; \
+    esac \
+ && if [ -n "$JUST_TRIPLE" ]; then \
+      mkdir -p /usr/local/bin \
+      && curl -sSfL "https://github.com/casey/just/releases/download/${JUST_VERSION}/just-${JUST_VERSION}-${JUST_TRIPLE}.tar.gz" \
+         | tar xz -C /usr/local/bin just 2>/dev/null || true; \
+    fi
+
+USER dev
+WORKDIR /app
+
+# Install pinned code-generation tools into the user's GOPATH.
+RUN go install github.com/a-h/templ/cmd/templ@v0.3.1001 \
+ && go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+
+ENV PATH=/home/dev/go/bin:/usr/local/bin:$PATH
+
+CMD ["bash"]

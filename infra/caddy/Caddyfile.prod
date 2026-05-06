@@ -10,5 +10,5 @@ app.acai.sh {
     respond @health "ok: Caddyfile.prod" 200
 
 	encode gzip
-	reverse_proxy app:4000
+	reverse_proxy acai:4000
 }
