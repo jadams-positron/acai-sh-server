@@ -43,6 +43,28 @@ func TestTeamShow_RendersForMember(t *testing.T) {
 	}
 }
 
+func TestTeamShow_EmptyState_NudgesProductCreation(t *testing.T) {
+	app := testfx.NewApp(t, testfx.NewAppOpts{})
+	user := testfx.SeedUser(t, app.DB, testfx.SeedUserOpts{Email: "team-empty@test.example"})
+	team := testfx.SeedTeam(t, app.DB, testfx.SeedTeamOpts{Name: "emptyprodteam"})
+	testfx.SeedUserTeamRole(t, app.DB, user, team, "owner")
+
+	client := testfx.LoggedInClient(t, app, user)
+	resp := client.GET("/t/emptyprodteam", nil)
+	resp.AssertStatus(http.StatusOK)
+
+	body := string(resp.Body())
+	for _, want := range []string{
+		"No products yet",
+		`class="empty-state empty-state-rich"`, // upgraded empty-state styling
+		"container for the features",           // explanatory copy
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected %q in team-empty body; got: %.800s", want, body)
+		}
+	}
+}
+
 func TestTeamShow_404ForNonMember(t *testing.T) {
 	app := testfx.NewApp(t, testfx.NewAppOpts{})
 	user := testfx.SeedUser(t, app.DB, testfx.SeedUserOpts{Email: "nonmember@test.example"})

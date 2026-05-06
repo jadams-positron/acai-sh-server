@@ -57,11 +57,16 @@ func TestProductShow_EmptyState(t *testing.T) {
 	resp.AssertStatus(http.StatusOK)
 
 	body := string(resp.Body())
-	if !strings.Contains(body, "No implementations yet") {
-		t.Errorf("expected 'No implementations yet' empty state; got: %.500s", body)
-	}
-	if !strings.Contains(body, "No features yet") {
-		t.Errorf("expected 'No features yet' empty state; got: %.500s", body)
+	for _, want := range []string{
+		"No implementations yet",
+		"No features yet",
+		// Both empty states should surface the actual acai push command —
+		// the product name interpolated into a copy-pasteable snippet.
+		"acai push --product emptyproduct --all",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected %q in product-empty body; got: %.800s", want, body)
+		}
 	}
 }
 

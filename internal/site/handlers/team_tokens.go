@@ -75,6 +75,7 @@ func renderTeamTokens(c echo.Context, d *TeamTokensDeps, team *teams.Team, flash
 		Flash:             flash,
 		FlashType:         flashType,
 		NewlyCreatedToken: newToken,
+		APIBaseURL:        c.Scheme() + "://" + c.Request().Host + "/api/v1",
 	}).Render(c.Request().Context(), c.Response())
 }
 

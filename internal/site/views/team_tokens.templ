@@ -15,6 +15,7 @@ type TeamTokensProps struct {
 	Flash             string
 	FlashType         string // "error" or "success"
 	NewlyCreatedToken string // shown ONCE after token creation
+	APIBaseURL        string // e.g. "https://app.acai.sh/api/v1" — surfaced in the empty-state nudge
 }
 
 templ TeamTokens(p TeamTokensProps) {
@@ -45,8 +46,17 @@ templ TeamTokens(p TeamTokensProps) {
 					</button>
 				</div>
 				if len(p.Tokens) == 0 {
-					<div class="empty-state">
-						<p>No tokens yet. Create one to get started.</p>
+					<div class="empty-state empty-state-rich">
+						<p class="empty-state-headline">No tokens yet</p>
+						<p>The <code>acai</code> CLI uses an API token to push specs and read state. Create one here, then drop it into the <code>.env</code> of any repo you want to sync:</p>
+						<code class="empty-state-snippet">ACAI_API_BASE_URL={ p.APIBaseURL }
+ACAI_API_TOKEN=&lt;paste-the-token-once-it's-shown&gt;</code>
+						<p class="subtitle">The plaintext token is shown <strong>exactly once</strong> after creation — copy it then.</p>
+						<div>
+							<button class="button button-primary" data-on-click="$showCreateModal = true" type="button">
+								+ Create Token
+							</button>
+						</div>
 					</div>
 				} else {
 					<div class="panel" style="padding: 0;">

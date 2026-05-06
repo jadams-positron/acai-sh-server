@@ -37,6 +37,29 @@ func TestTeamTokens_Renders(t *testing.T) {
 	}
 }
 
+func TestTeamTokens_EmptyState_ShowsCLINudge(t *testing.T) {
+	app := testfx.NewApp(t, testfx.NewAppOpts{})
+	user := testfx.SeedUser(t, app.DB, testfx.SeedUserOpts{Email: "tok-empty@test.example"})
+	team := testfx.SeedTeam(t, app.DB, testfx.SeedTeamOpts{Name: "emptytokteam"})
+	testfx.SeedUserTeamRole(t, app.DB, user, team, "owner")
+
+	client := testfx.LoggedInClient(t, app, user)
+	resp := client.GET(tokensURL("emptytokteam"), nil)
+	resp.AssertStatus(http.StatusOK)
+
+	body := string(resp.Body())
+	for _, want := range []string{
+		"No tokens yet",
+		"ACAI_API_BASE_URL=",    // empty-state surfaces the env var
+		"ACAI_API_TOKEN=",       // …and the secret env var
+		`"empty-state-snippet"`, // the styled code block class
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected %q in tokens-empty body; got: %.800s", want, body)
+		}
+	}
+}
+
 func TestTeamTokens_Create_HappyPath(t *testing.T) {
 	app := testfx.NewApp(t, testfx.NewAppOpts{})
 	user := testfx.SeedUser(t, app.DB, testfx.SeedUserOpts{Email: "create-tok@test.example"})

@@ -33,8 +33,14 @@ templ TeamShow(p TeamShowProps) {
 					</button>
 				</div>
 				if len(p.Products) == 0 {
-					<div class="empty-state">
-						<p>No products yet. Create one to get started.</p>
+					<div class="empty-state empty-state-rich">
+						<p class="empty-state-headline">No products yet</p>
+						<p>A <strong>product</strong> is a container for the features you want to track. You'll group your specs, branches, and implementations under one. Create your first product to begin.</p>
+						<div>
+							<button class="button button-primary" data-on-click="$showProductModal = true" type="button">
+								+ Create Product
+							</button>
+						</div>
 					</div>
 				} else {
 					<div style="display: grid; gap: var(--space-md); grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));">
