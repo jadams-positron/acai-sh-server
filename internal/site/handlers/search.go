@@ -33,6 +33,7 @@ type SearchResult struct {
 
 // SearchResponse is the JSON shape consumed by the Cmd+K palette.
 type SearchResponse struct {
+	Teams    []SearchResult `json:"teams"`
 	Products []SearchResult `json:"products"`
 	Impls    []SearchResult `json:"impls"`
 	Features []SearchResult `json:"features"`
@@ -73,6 +74,25 @@ func Search(d *SearchDeps) echo.HandlerFunc {
 		const maxPerGroup = 5
 
 		out := SearchResponse{}
+
+		// Teams the user is a member of — useful for jumping out of the
+		// current scope without going back to /teams. Always included so
+		// search by team name works from any page.
+		userTeams, err := d.Teams.ListForUser(c.Request().Context(), scope.User.ID)
+		if err == nil {
+			for _, ut := range userTeams {
+				if !strings.Contains(strings.ToLower(ut.Name), needle) {
+					continue
+				}
+				out.Teams = append(out.Teams, SearchResult{
+					Label: ut.Name,
+					Href:  "/t/" + ut.Name,
+				})
+				if len(out.Teams) >= maxPerGroup {
+					break
+				}
+			}
+		}
 
 		// Products.
 		prods, err := d.Products.ListForTeam(c.Request().Context(), team.ID)

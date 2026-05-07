@@ -10,6 +10,7 @@ import (
 )
 
 type searchResponse struct {
+	Teams    []struct{ Label, Href, Hint string } `json:"teams"`
 	Products []struct{ Label, Href, Hint string } `json:"products"`
 	Impls    []struct{ Label, Href, Hint string } `json:"impls"`
 	Features []struct{ Label, Href, Hint string } `json:"features"`
@@ -71,6 +72,31 @@ func TestSearch_FindsAcrossGroups(t *testing.T) {
 	_ = json.Unmarshal(resp3.Body(), &out3)
 	if len(out3.Products)+len(out3.Impls)+len(out3.Features)+len(out3.Branches) != 0 {
 		t.Errorf("expected empty groups for empty query; got %+v", out3)
+	}
+}
+
+func TestSearch_FindsTeams(t *testing.T) {
+	app := testfx.NewApp(t, testfx.NewAppOpts{})
+	user := testfx.SeedUser(t, app.DB, testfx.SeedUserOpts{Email: "team-search@test.example"})
+	teamA := testfx.SeedTeam(t, app.DB, testfx.SeedTeamOpts{Name: "orchestration"})
+	teamB := testfx.SeedTeam(t, app.DB, testfx.SeedTeamOpts{Name: "research"})
+	testfx.SeedUserTeamRole(t, app.DB, user, teamA, "owner")
+	testfx.SeedUserTeamRole(t, app.DB, user, teamB, "member")
+
+	client := testfx.LoggedInClient(t, app, user)
+
+	// "orch" should match the orchestration team.
+	resp := client.GET("/t/orchestration/search?q=orch", nil)
+	resp.AssertStatus(http.StatusOK)
+	var out searchResponse
+	if err := json.Unmarshal(resp.Body(), &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(out.Teams) != 1 || out.Teams[0].Label != "orchestration" {
+		t.Errorf("expected orchestration team hit; got %+v", out.Teams)
+	}
+	if out.Teams[0].Href != "/t/orchestration" {
+		t.Errorf("expected href /t/orchestration; got %q", out.Teams[0].Href)
 	}
 }
 
