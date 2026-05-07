@@ -126,6 +126,7 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Logger:          logger,
 		Teams:           deps.Teams,
 		Implementations: deps.Implementations,
+		FeatureView:     featureViewSvc,
 	}
 	site.MountImplsIndexRoutes(browser, implsIndexDeps, csrfMW)
 	implShowDeps := &handlers.ImplShowDeps{
@@ -137,10 +138,11 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 	}
 	site.MountImplShowRoutes(browser, implShowDeps, csrfMW)
 	featuresIndexDeps := &handlers.FeaturesIndexDeps{
-		Logger:   logger,
-		Teams:    deps.Teams,
-		Products: deps.Products,
-		Specs:    deps.Specs,
+		Logger:      logger,
+		Teams:       deps.Teams,
+		Products:    deps.Products,
+		Specs:       deps.Specs,
+		FeatureView: featureViewSvc,
 	}
 	site.MountFeaturesIndexRoutes(browser, featuresIndexDeps, csrfMW)
 	branchesIndexDeps := &handlers.BranchesIndexDeps{

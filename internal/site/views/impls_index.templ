@@ -5,6 +5,7 @@ import (
 
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+	"github.com/jadams-positron/acai-sh-server/internal/services"
 )
 
 // ImplsIndexProps drives the /t/{team_name}/implementations page.
@@ -12,6 +13,7 @@ type ImplsIndexProps struct {
 	Shell           ShellProps
 	Team            *teams.Team
 	Implementations []*implementations.Implementation
+	Overviews       map[string]*services.ImplOverview // keyed by impl.ID
 }
 
 templ ImplsIndex(p ImplsIndexProps) {
@@ -25,12 +27,12 @@ templ ImplsIndex(p ImplsIndexProps) {
 				<p>No implementations yet. Create one via <code>acai push --target=&lt;name&gt;</code> on a tracked branch.</p>
 			</div>
 		} else {
-			@implsByProduct(p.Team.Name, groupImplsByProduct(p.Implementations))
+			@implsByProduct(p.Team.Name, groupImplsByProduct(p.Implementations), p.Overviews)
 		}
 	}
 }
 
-templ implsByProduct(teamName string, groups []implsGroup) {
+templ implsByProduct(teamName string, groups []implsGroup, overviews map[string]*services.ImplOverview) {
 	<div style="display: grid; gap: var(--space-xl);">
 		for _, g := range groups {
 			<section>
@@ -42,13 +44,14 @@ templ implsByProduct(teamName string, groups []implsGroup) {
 						<thead>
 							<tr style="border-bottom: 1px solid var(--border-subtle); text-align: left;">
 								<th style="padding: var(--space-md);">Implementation</th>
-								<th style="padding: var(--space-md);">Description</th>
 								<th style="padding: var(--space-md);">Lineage</th>
+								<th style="padding: var(--space-md); width: 30%;">Progress</th>
+								<th style="padding: var(--space-md); text-align: right;">Status</th>
 							</tr>
 						</thead>
 						<tbody>
 							for _, impl := range g.Implementations {
-								@implsRow(teamName, impl, g.NameByID)
+								@implsRow(teamName, impl, g.NameByID, overviews[impl.ID])
 							}
 						</tbody>
 					</table>
@@ -58,16 +61,12 @@ templ implsByProduct(teamName string, groups []implsGroup) {
 	</div>
 }
 
-templ implsRow(teamName string, impl *implementations.Implementation, nameByID map[string]string) {
+templ implsRow(teamName string, impl *implementations.Implementation, nameByID map[string]string, overview *services.ImplOverview) {
 	<tr style="border-top: 1px solid var(--border-subtle);">
 		<td style="padding: var(--space-md);">
 			<a href={ templ.SafeURL("/t/" + teamName + "/i/" + implSlug(impl)) }>{ impl.Name }</a>
-		</td>
-		<td style="padding: var(--space-md);">
 			if impl.Description != nil && *impl.Description != "" {
-				{ *impl.Description }
-			} else {
-				<span class="subtitle">—</span>
+				<div class="subtitle" style="font-size: var(--text-xs); margin-top: 2px;">{ *impl.Description }</div>
 			}
 		</td>
 		<td style="padding: var(--space-md); color: var(--muted); font-size: var(--text-sm);">
@@ -79,6 +78,18 @@ templ implsRow(teamName string, impl *implementations.Implementation, nameByID m
 				}
 			} else {
 				root impl
+			}
+		</td>
+		<td style="padding: var(--space-md); vertical-align: middle;">
+			if overview != nil && overview.AggregateTotal > 0 {
+				@progressBar(overview.AggregateCounts, overview.AggregateTotal)
+			} else {
+				<span class="subtitle">no specs yet</span>
+			}
+		</td>
+		<td style="padding: var(--space-md); text-align: right; font-size: var(--text-sm);">
+			if overview != nil && overview.AggregateTotal > 0 {
+				@statusLegend(overview.AggregateCounts)
 			}
 		</td>
 	</tr>

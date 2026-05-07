@@ -9,6 +9,7 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+	"github.com/jadams-positron/acai-sh-server/internal/services"
 	"github.com/jadams-positron/acai-sh-server/internal/site/views"
 )
 
@@ -17,6 +18,7 @@ type ImplsIndexDeps struct {
 	Logger          *slog.Logger
 	Teams           *teams.Repository
 	Implementations *implementations.Repository
+	FeatureView     *services.FeatureViewService
 }
 
 // ImplsIndex renders GET /t/:team_name/implementations.
@@ -48,6 +50,21 @@ func ImplsIndex(d *ImplsIndexDeps) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load implementations")
 		}
 
+		// Per-impl progress overview — one ResolveImplOverview call per impl.
+		// Acceptable at typical team sizes; if N grows, batch via a single
+		// SQL roll-up query keyed by impl_id.
+		overviews := make(map[string]*services.ImplOverview, len(impls))
+		for _, impl := range impls {
+			ov, err := d.FeatureView.ResolveImplOverview(c.Request().Context(), services.ImplOverviewRequest{
+				Implementation: impl,
+			})
+			if err != nil {
+				d.Logger.Error("impls index: ResolveImplOverview", "error", err, "impl", impl.Name)
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to load impl overviews")
+			}
+			overviews[impl.ID] = ov
+		}
+
 		shell, err := buildShellChrome(c, d.Teams, "Implementations · "+team.Name, team, "implementations", []views.Crumb{
 			{Label: "Teams", HRef: "/teams"},
 			{Label: team.Name, HRef: "/t/" + team.Name},
@@ -63,6 +80,7 @@ func ImplsIndex(d *ImplsIndexDeps) echo.HandlerFunc {
 			Shell:           shell,
 			Team:            team,
 			Implementations: impls,
+			Overviews:       overviews,
 		}).Render(c.Request().Context(), c.Response())
 	}
 }
