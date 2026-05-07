@@ -66,6 +66,7 @@ templ commandPalette(team *teams.Team) {
 
 			function render(data) {
 				const groups = [
+					{ name: 'Teams', items: data.teams || [] },
 					{ name: 'Products', items: data.products || [] },
 					{ name: 'Implementations', items: data.impls || [] },
 					{ name: 'Features', items: data.features || [] },

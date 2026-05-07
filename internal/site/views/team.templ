@@ -185,23 +185,26 @@ templ teamHeatmap(teamName string, h *services.TeamHeatmap) {
 							<th class="heatmap-corner"></th>
 							for _, name := range h.FeatureNames {
 								<th class="heatmap-th-feature" scope="col">
-									<a href={ templ.SafeURL("/t/" + teamName + "/f/" + name) }>
-										<span>{ name }</span>
-									</a>
+									<a href={ templ.SafeURL("/t/" + teamName + "/f/" + name) }>{ name }</a>
 								</th>
 							}
-							<th class="heatmap-th-rowtotal" scope="col">
-								<span>Total</span>
-							</th>
+							<th class="heatmap-corner"></th>
 						</tr>
 					</thead>
 					<tbody>
 						for _, row := range h.Rows {
-							@teamHeatmapRow(teamName, row)
+							if row.ProductPresent {
+								@teamHeatmapRow(teamName, row)
+							}
 						}
 					</tbody>
 				</table>
 			</div>
+			if hiddenEmptyCount(h) > 0 {
+				<p class="subtitle" style="margin: var(--space-sm) 0 0; font-size: var(--text-xs);">
+					{ fmt.Sprintf("+ %s without specs yet — push from a tracked branch to add them to the matrix", pluralize(hiddenEmptyCount(h), "product")) }
+				</p>
+			}
 			<div class="heatmap-legend">
 				<span class="heatmap-legend-label">none</span>
 				<span class="heatmap-legend-swatch" data-fill="0"></span>
@@ -230,18 +233,27 @@ templ teamHeatmapRow(teamName string, row *services.HeatmapRow) {
 			@teamHeatmapCell(teamName, cell)
 		}
 		<td class="heatmap-cell-total">
-			if row.ProductPresent && row.ProductTotal > 0 {
-				<div class="heatmap-cell-total-pct">
-					{ fmt.Sprintf("%d%%", percentInt(row.ProductCounts.Completed+row.ProductCounts.Accepted, row.ProductTotal)) }
-				</div>
-				<div class="heatmap-cell-total-meta">
-					{ fmt.Sprintf("%d ACIDs", row.ProductTotal) }
-				</div>
-			} else {
-				<div class="heatmap-cell-total-pct subtitle">—</div>
-			}
+			<div class="heatmap-cell-total-pct">
+				{ fmt.Sprintf("%d%%", percentInt(row.ProductCounts.Completed+row.ProductCounts.Accepted, row.ProductTotal)) }
+			</div>
+			<div class="heatmap-cell-total-meta">
+				{ fmt.Sprintf("%d ACIDs", row.ProductTotal) }
+			</div>
 		</td>
 	</tr>
+}
+
+// hiddenEmptyCount returns the number of products in the matrix that
+// have no specs yet — they're filtered out of the rendered grid but
+// surfaced in a small footnote so the user knows they exist.
+func hiddenEmptyCount(h *services.TeamHeatmap) int {
+	n := 0
+	for _, row := range h.Rows {
+		if !row.ProductPresent {
+			n++
+		}
+	}
+	return n
 }
 
 templ teamHeatmapCell(teamName string, cell *services.HeatmapCell) {
