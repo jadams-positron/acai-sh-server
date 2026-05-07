@@ -11,15 +11,17 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/specs"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
+	"github.com/jadams-positron/acai-sh-server/internal/services"
 	"github.com/jadams-positron/acai-sh-server/internal/site/views"
 )
 
 // FeaturesIndexDeps groups dependencies for the cross-product features index.
 type FeaturesIndexDeps struct {
-	Logger   *slog.Logger
-	Teams    *teams.Repository
-	Products *products.Repository
-	Specs    *specs.Repository
+	Logger      *slog.Logger
+	Teams       *teams.Repository
+	Products    *products.Repository
+	Specs       *specs.Repository
+	FeatureView *services.FeatureViewService
 }
 
 // FeaturesIndex renders GET /t/:team_name/features.
@@ -71,7 +73,10 @@ func FeaturesIndex(d *FeaturesIndexDeps) echo.HandlerFunc {
 			}
 		}
 
-		// Flatten into a sorted slice for stable rendering.
+		// Flatten into a sorted slice for stable rendering. For each feature,
+		// resolve the team-wide view (cards across impls) and fold the
+		// per-impl counts into a single aggregate for the row's progress
+		// bar — same arithmetic the team heatmap uses.
 		entries := make([]views.FeaturesIndexEntry, 0, len(productsPerFeature))
 		for name, prodSet := range productsPerFeature {
 			productNames := make([]string, 0, len(prodSet))
@@ -79,9 +84,36 @@ func FeaturesIndex(d *FeaturesIndexDeps) echo.HandlerFunc {
 				productNames = append(productNames, p)
 			}
 			sort.Strings(productNames)
+
+			fv, err := d.FeatureView.Resolve(c.Request().Context(), services.FeatureViewRequest{
+				Team:        team,
+				FeatureName: name,
+			})
+			if err != nil {
+				d.Logger.Error("features index: Resolve", "error", err, "feature", name)
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to load feature aggregates")
+			}
+
+			var (
+				total  int
+				counts services.StatusCounts
+			)
+			for _, card := range fv.Cards {
+				total += card.TotalRequirements
+				counts.Null += card.Counts.Null
+				counts.Assigned += card.Counts.Assigned
+				counts.Blocked += card.Counts.Blocked
+				counts.Incomplete += card.Counts.Incomplete
+				counts.Completed += card.Counts.Completed
+				counts.Rejected += card.Counts.Rejected
+				counts.Accepted += card.Counts.Accepted
+			}
+
 			entries = append(entries, views.FeaturesIndexEntry{
-				FeatureName:  name,
-				ProductNames: productNames,
+				FeatureName:       name,
+				ProductNames:      productNames,
+				TotalRequirements: total,
+				Counts:            counts,
 			})
 		}
 		sort.Slice(entries, func(i, j int) bool { return entries[i].FeatureName < entries[j].FeatureName })
