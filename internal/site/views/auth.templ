@@ -34,7 +34,8 @@ templ LoginPage(p LoginPageProps) {
 
 // LoginRequestedProps configures the post-submit "check your email" page.
 type LoginRequestedProps struct {
-	Email string
+	Email     string
+	CSRFToken string
 }
 
 templ LoginRequestedPage(p LoginRequestedProps) {
@@ -43,9 +44,21 @@ templ LoginRequestedPage(p LoginRequestedProps) {
 			<header class="panel-header">
 				<h1>Check your email</h1>
 			</header>
-			<p>If <strong>{ p.Email }</strong> matches an account, you'll receive a magic link shortly.</p>
+			<p>
+				If <strong>{ p.Email }</strong> matches an account, a magic link is on the way.
+			</p>
+			<p class="subtitle" style="margin-top: var(--space-md);">
+				The link expires in <strong>15 minutes</strong>. If it doesn't arrive in the next minute or two, check your spam folder — or send a new one.
+			</p>
+			<form method="post" action="/users/log-in" class="form" style="margin-top: var(--space-lg);">
+				<input type="hidden" name="gorilla.csrf.Token" value={ p.CSRFToken }/>
+				<input type="hidden" name="email" value={ p.Email }/>
+				<button class="button button-ghost button-block" type="submit">
+					Resend the link
+				</button>
+			</form>
 			<div class="panel-footer">
-				<a href="/users/log-in">Back to log in</a>
+				<a href="/users/log-in">Use a different email</a>
 			</div>
 		</section>
 	}

@@ -70,7 +70,10 @@ func LoginCreate(d *AuthDeps) echo.HandlerFunc {
 		}
 
 		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
-		return views.LoginRequestedPage(views.LoginRequestedProps{Email: email}).Render(c.Request().Context(), c.Response())
+		return views.LoginRequestedPage(views.LoginRequestedProps{
+			Email:     email,
+			CSRFToken: csrfTokenFromEcho(c),
+		}).Render(c.Request().Context(), c.Response())
 	}
 }
 
