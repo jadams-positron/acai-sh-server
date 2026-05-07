@@ -59,6 +59,9 @@ templ Shell(p ShellProps) {
 						{ children... }
 					</main>
 				</div>
+				if p.ActiveTeam != nil {
+					@commandPalette(p.ActiveTeam)
+				}
 			</div>
 		</body>
 	</html>
@@ -87,8 +90,18 @@ templ teamSwitcher(ts []*teams.Team, active *teams.Team) {
 }
 
 // userChip renders the right-side identity block: email + logout form.
+// The Cmd+K hint sits to the left of the email as a quiet keyboard
+// affordance — clicking it opens the palette via a synthetic keydown.
 templ userChip(email, csrfToken string) {
 	<div class="user-chip">
+		<button
+			type="button"
+			class="kbd-hint"
+			title="Quick search (⌘K)"
+			onclick="document.dispatchEvent(new KeyboardEvent('keydown', {key: 'k', metaKey: true, ctrlKey: true}))"
+		>
+			<kbd>⌘</kbd><kbd>K</kbd>
+		</button>
 		<span class="user-chip-email">{ email }</span>
 		<form method="post" action="/users/log-out">
 			<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>

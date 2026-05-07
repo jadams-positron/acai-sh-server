@@ -155,6 +155,14 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Implementations: deps.Implementations,
 	}
 	site.MountBranchesIndexRoutes(browser, branchesIndexDeps, csrfMW)
+	searchDeps := &handlers.SearchDeps{
+		Logger:          logger,
+		Teams:           deps.Teams,
+		Products:        deps.Products,
+		Implementations: deps.Implementations,
+		Specs:           deps.Specs,
+	}
+	site.MountSearchRoutes(browser, searchDeps)
 	teamSettingsDeps := &handlers.TeamSettingsDeps{
 		Logger:   logger,
 		Teams:    deps.Teams,
