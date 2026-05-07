@@ -74,6 +74,12 @@ func MountFeaturesIndexRoutes(g *echo.Group, deps *handlers.FeaturesIndexDeps, c
 	authd.GET("/t/:team_name/features", handlers.FeaturesIndex(deps))
 }
 
+// MountSearchRoutes registers the /t/:team_name/search JSON endpoint.
+func MountSearchRoutes(g *echo.Group, deps *handlers.SearchDeps) {
+	authd := g.Group("", auth.RequireAuth)
+	authd.GET("/t/:team_name/search", handlers.Search(deps))
+}
+
 // MountBranchesIndexRoutes registers the /t/:team_name/branches index route.
 func MountBranchesIndexRoutes(g *echo.Group, deps *handlers.BranchesIndexDeps, csrfMiddleware echo.MiddlewareFunc) {
 	authd := g.Group("", csrfMiddleware, auth.RequireAuth)

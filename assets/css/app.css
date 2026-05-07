@@ -807,6 +807,145 @@ code {
     white-space: pre;
 }
 
+/* === Cmd+K palette === */
+.palette-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 12vh;
+}
+
+.palette-backdrop[hidden] {
+    display: none;
+}
+
+.palette {
+    width: min(640px, 92vw);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow:
+        0 0 40px var(--glow-soft),
+        0 24px 80px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+}
+
+.palette-input {
+    width: 100%;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--fg);
+    padding: var(--space-md) var(--space-lg);
+    font-size: var(--text-lg);
+    font-family: inherit;
+    outline: none;
+}
+
+.palette-input::placeholder {
+    color: var(--muted);
+}
+
+.palette-results {
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: var(--space-sm);
+}
+
+.palette-hint {
+    margin: 0;
+    padding: var(--space-md);
+    color: var(--muted);
+    font-size: var(--text-sm);
+    text-align: center;
+}
+
+.palette-group + .palette-group {
+    margin-top: var(--space-sm);
+    border-top: 1px solid var(--border-subtle);
+    padding-top: var(--space-sm);
+}
+
+.palette-group-label {
+    color: var(--muted);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    padding: 4px var(--space-md);
+}
+
+.palette-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-md);
+    padding: 8px var(--space-md);
+    border-radius: var(--radius-sm);
+    color: var(--fg);
+    text-decoration: none;
+    transition: background 0.1s ease;
+}
+
+.palette-item:hover {
+    background: rgba(var(--color-accent-rgb), 0.06);
+    text-decoration: none;
+}
+
+.palette-item.is-selected {
+    background: rgba(var(--color-accent-rgb), 0.14);
+    color: var(--accent);
+}
+
+.palette-item-hint {
+    color: var(--muted);
+    font-size: var(--text-sm);
+}
+
+.palette-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    border-top: 1px solid var(--border-subtle);
+    color: var(--muted);
+    font-size: var(--text-xs);
+}
+
+/* === <kbd> styling, used in topbar hint and palette footer === */
+kbd {
+    display: inline-block;
+    padding: 1px 6px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--surface-inset);
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    line-height: 1.4;
+}
+
+.kbd-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    background: transparent;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    color: var(--muted);
+    margin-right: var(--space-md);
+}
+
+.kbd-hint:hover kbd {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
 /* === Inline status select (ACID drilldown) === */
 .status-select {
     background: rgba(var(--color-accent-rgb), 0.06);
