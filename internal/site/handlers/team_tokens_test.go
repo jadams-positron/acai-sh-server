@@ -50,9 +50,10 @@ func TestTeamTokens_EmptyState_ShowsCLINudge(t *testing.T) {
 	body := string(resp.Body())
 	for _, want := range []string{
 		"No tokens yet",
-		"ACAI_API_BASE_URL=",    // empty-state surfaces the env var
-		"ACAI_API_TOKEN=",       // …and the secret env var
-		`"empty-state-snippet"`, // the styled code block class
+		"ACAI_API_BASE_URL=",    // empty-state surfaces the env var (in install-step hint)
+		"npm install -g @acai",  // install step shows the npm command
+		"acai push --product",   // push step shows the command
+		`class="install-steps"`, // numbered install-steps wrapper
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("expected %q in tokens-empty body; got: %.800s", want, body)

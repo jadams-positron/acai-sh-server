@@ -17,6 +17,7 @@ type TeamShowProps struct {
 	Heatmap              *services.TeamHeatmap // nil when there are no products
 	Members              []*teams.Member
 	CSRFToken            string
+	APIBaseURL           string // surfaced in the no-products onboarding card
 	Flash                string
 	PrefilledProductName string
 }
@@ -44,10 +45,14 @@ templ TeamShow(p TeamShowProps) {
 				if len(p.Products) == 0 {
 					<div class="empty-state empty-state-rich">
 						<p class="empty-state-headline">No products yet</p>
-						<p>A <strong>product</strong> is a container for the features you want to track. You'll group your specs, branches, and implementations under one. Create your first product to begin.</p>
-						<div>
+						<p>A <strong>product</strong> is a container for the features you want to track. Create one in the UI, or push from your repo and the CLI will create one for you:</p>
+						@cliInstallSteps(CLIInstallProps{
+							TeamName:   p.Team.Name,
+							APIBaseURL: p.APIBaseURL,
+						})
+						<div style="border-top: 1px solid var(--border-subtle); padding-top: var(--space-md); margin-top: var(--space-sm);">
 							<button class="button button-primary" data-on-click="$showProductModal = true" type="button">
-								+ Create Product
+								+ Create Product in UI
 							</button>
 						</div>
 					</div>

@@ -85,12 +85,13 @@ func TeamShow(d *TeamShowDeps) echo.HandlerFunc {
 		}
 		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 		return views.TeamShow(views.TeamShowProps{
-			Shell:     shell,
-			Team:      team,
-			Products:  prods,
-			Heatmap:   heatmap,
-			Members:   members,
-			CSRFToken: csrfTokenFromEcho(c),
+			Shell:      shell,
+			Team:       team,
+			Products:   prods,
+			Heatmap:    heatmap,
+			Members:    members,
+			CSRFToken:  csrfTokenFromEcho(c),
+			APIBaseURL: c.Scheme() + "://" + c.Request().Host + "/api/v1",
 		}).Render(c.Request().Context(), c.Response())
 	}
 }
@@ -146,6 +147,7 @@ func TeamCreateProduct(d *TeamShowDeps) echo.HandlerFunc {
 				Products:             prods,
 				Members:              members,
 				CSRFToken:            csrfTokenFromEcho(c),
+				APIBaseURL:           c.Scheme() + "://" + c.Request().Host + "/api/v1",
 				Flash:                flash,
 				PrefilledProductName: name,
 			}).Render(c.Request().Context(), c.Response())
