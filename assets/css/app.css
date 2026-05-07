@@ -736,6 +736,26 @@ a:hover {
     color: var(--fg);
 }
 
+/* === "or" divider between auth options === */
+.form-divider {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+    margin: var(--space-md) 0;
+    color: var(--muted);
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+}
+
+.form-divider::before,
+.form-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-subtle);
+}
+
 /* === Banners (flash messages) === */
 .banner {
     padding: var(--space-md);
