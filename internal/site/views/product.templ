@@ -37,8 +37,10 @@ templ ProductShow(p ProductShowProps) {
 					<div class="empty-state empty-state-rich">
 						<p class="empty-state-headline">No implementations yet</p>
 						<p>An <strong>implementation</strong> represents one place this product is built — production, a feature branch, a fork. The CLI auto-creates one per branch when you push:</p>
-						<code class="empty-state-snippet">{ "# from your project repo, on the branch you want to track" }
+						@snippetWithCopy() {
+							<code class="empty-state-snippet">{ "# from your project repo, on the branch you want to track" }
 { "acai push --product " + p.Product.Name + " --all" }</code>
+						}
 					</div>
 				} else {
 					<div class="panel" style="padding: 0;">
@@ -66,7 +68,9 @@ templ ProductShow(p ProductShowProps) {
 					<div class="empty-state empty-state-rich">
 						<p class="empty-state-headline">No features yet</p>
 						<p>Features come from <code>*.feature.yaml</code> spec files in your repo. Add a spec, then run:</p>
-						<code class="empty-state-snippet">{ "acai push --product " + p.Product.Name + " --all" }</code>
+						@snippetWithCopy() {
+							<code class="empty-state-snippet">{ "acai push --product " + p.Product.Name + " --all" }</code>
+						}
 					</div>
 				} else {
 					<div class="panel" style="padding: 0;">

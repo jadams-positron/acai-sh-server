@@ -17,13 +17,17 @@ templ cliInstallSteps(p CLIInstallProps) {
 	<ol class="install-steps">
 		<li>
 			<span class="install-step-label">Install the CLI</span>
-			<code class="empty-state-snippet">npm install -g @acai.sh/cli</code>
+			@snippetWithCopy() {
+				<code class="empty-state-snippet">npm install -g @acai.sh/cli</code>
+			}
 		</li>
 		<li>
 			if p.PlaintextToken != "" {
 				<span class="install-step-label">Drop these env vars in your repo's <code>.env</code></span>
-				<code class="empty-state-snippet">{ "ACAI_API_BASE_URL=" + p.APIBaseURL }
+				@snippetWithCopy() {
+					<code class="empty-state-snippet">{ "ACAI_API_BASE_URL=" + p.APIBaseURL }
 { "ACAI_API_TOKEN=" + p.PlaintextToken }</code>
+				}
 				<p class="install-step-meta">The token is shown only once — copy it now.</p>
 			} else {
 				<span class="install-step-label">
@@ -34,10 +38,12 @@ templ cliInstallSteps(p CLIInstallProps) {
 		</li>
 		<li>
 			<span class="install-step-label">Push from your repo</span>
-			if p.ProductName != "" {
-				<code class="empty-state-snippet">{ "acai push --product " + p.ProductName + " --all" }</code>
-			} else {
-				<code class="empty-state-snippet">{ "acai push --product <product-name> --all" }</code>
+			@snippetWithCopy() {
+				if p.ProductName != "" {
+					<code class="empty-state-snippet">{ "acai push --product " + p.ProductName + " --all" }</code>
+				} else {
+					<code class="empty-state-snippet">{ "acai push --product <product-name> --all" }</code>
+				}
 			}
 			<p class="install-step-meta">Run from the repo root, on the branch you want to track. The CLI auto-creates an implementation per branch.</p>
 		</li>

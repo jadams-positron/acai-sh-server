@@ -1,0 +1,31 @@
+package views
+
+// snippetWithCopy wraps a code-snippet block in a div that adds a small
+// "copy" button anchored top-right of the block. The button uses Datastar
+// signals scoped to the wrapper (so each snippet on a page has its own
+// "copied" state), reads the snippet's text via the previous-sibling
+// reference, and flips between copy/check icons for 1.5s after click.
+//
+// Usage:
+//   @snippetWithCopy() {
+//       <code class="empty-state-snippet">…snippet text…</code>
+//   }
+templ snippetWithCopy() {
+	<div class="snippet-with-copy" data-signals="{copied: false}">
+		{ children... }
+		<button
+			type="button"
+			class="copy-btn"
+			aria-label="Copy to clipboard"
+			data-on-click="navigator.clipboard.writeText(evt.currentTarget.parentElement.querySelector('.empty-state-snippet, .copy-target').textContent.trim()); $copied = true; setTimeout(() => $copied = false, 1500)"
+		>
+			<svg class="copy-icon-glyph" data-show="!$copied" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+				<rect x="4.5" y="4.5" width="9" height="9" rx="1.5"></rect>
+				<path d="M2.5 11V3a.5.5 0 0 1 .5-.5h8"></path>
+			</svg>
+			<svg class="copy-icon-glyph" data-show="$copied" viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+				<path d="m3.5 8 3 3 6-6"></path>
+			</svg>
+		</button>
+	</div>
+}
