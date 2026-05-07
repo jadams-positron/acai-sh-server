@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/events"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/specs"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
@@ -22,6 +23,7 @@ type ImplShowDeps struct {
 	Implementations *implementations.Repository
 	Specs           *specs.Repository
 	FeatureView     *services.FeatureViewService
+	Events          *events.Repository
 }
 
 // ImplShow renders GET /t/:team_name/i/:impl_slug.
@@ -102,6 +104,12 @@ func ImplShow(d *ImplShowDeps) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed")
 		}
 
+		implScopeID := impl.ID
+		recents, _ := d.Events.RecentForScope(c.Request().Context(), events.Scope{
+			TeamID: team.ID,
+			ImplID: &implScopeID,
+		}, 5)
+
 		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 		return views.ImplShow(views.ImplShowProps{
 			Shell:           shell,
@@ -111,6 +119,7 @@ func ImplShow(d *ImplShowDeps) echo.HandlerFunc {
 			Parent:          parent,
 			Overview:        overview,
 			TrackedBranches: trackedBranches,
+			Recents:         recents,
 		}).Render(c.Request().Context(), c.Response())
 	}
 }

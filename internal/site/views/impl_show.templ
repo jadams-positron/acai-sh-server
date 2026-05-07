@@ -3,6 +3,7 @@ package views
 import (
 	"fmt"
 
+	"github.com/jadams-positron/acai-sh-server/internal/domain/events"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
 	domainspecs "github.com/jadams-positron/acai-sh-server/internal/domain/specs"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
@@ -18,6 +19,7 @@ type ImplShowProps struct {
 	Parent          *implementations.Implementation // nil if no parent
 	Overview        *services.ImplOverview          // per-feature progress + aggregate
 	TrackedBranches []*domainspecs.Branch           // branches feeding this impl
+	Recents         []*events.Event                 // last 5 events scoped to this impl
 }
 
 templ ImplShow(p ImplShowProps) {
@@ -48,6 +50,8 @@ templ ImplShow(p ImplShowProps) {
 		if p.Overview != nil && p.Overview.AggregateTotal > 0 {
 			@implOverviewBanner(p.Overview)
 		}
+
+		@recentActivity(p.Recents)
 
 		if len(p.TrackedBranches) > 0 {
 			<section style="margin-bottom: var(--space-xl);">

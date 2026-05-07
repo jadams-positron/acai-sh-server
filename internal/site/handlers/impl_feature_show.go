@@ -8,7 +8,9 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/events"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/specs"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/services"
 	"github.com/jadams-positron/acai-sh-server/internal/site/views"
@@ -21,6 +23,8 @@ type ImplFeatureShowDeps struct {
 	FeatureView     *services.FeatureViewService
 	FeatureStates   *services.FeatureStatesService
 	Implementations *implementations.Repository
+	Specs           *specs.Repository
+	Events          *events.Repository
 }
 
 // ImplFeatureShow renders GET /t/:team_name/i/:impl_slug/f/:feature_name.
@@ -157,6 +161,28 @@ func ImplFeatureSetStatus(d *ImplFeatureShowDeps) echo.HandlerFunc {
 			}
 			d.Logger.Error("impl feature set status: FeatureStates.Update", "error", err)
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to update status")
+		}
+
+		// Emit best-effort event. A failure here doesn't roll back the state
+		// change — the user already saw their write succeed.
+		toForPayload := status
+		actorID := scope.User.ID
+		feat := featureName
+		productID := impl.ProductID
+		eventImplID := impl.ID
+		if err := d.Events.Emit(c.Request().Context(), events.EmitParams{
+			TeamID:      team.ID,
+			ProductID:   &productID,
+			ImplID:      &eventImplID,
+			FeatureName: &feat,
+			ActorUserID: &actorID,
+			Kind:        events.KindStatusChanged,
+			Payload: map[string]any{
+				"acid": acid,
+				"to":   toForPayload,
+			},
+		}); err != nil {
+			d.Logger.Warn("impl feature set status: events.Emit", "error", err)
 		}
 
 		return c.Redirect(http.StatusSeeOther,

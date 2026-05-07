@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/jadams-positron/acai-sh-server/internal/domain/events"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/services"
@@ -16,6 +17,7 @@ type TeamShowProps struct {
 	Products             []*products.Product
 	Heatmap              *services.TeamHeatmap // nil when there are no products
 	Members              []*teams.Member
+	Recents              []*events.Event
 	CSRFToken            string
 	APIBaseURL           string // surfaced in the no-products onboarding card
 	Flash                string
@@ -35,6 +37,7 @@ templ TeamShow(p TeamShowProps) {
 				@teamOverviewBanner(p.Heatmap)
 				@teamHeatmap(p.Team.Name, p.Heatmap)
 			}
+			@recentActivity(p.Recents)
 			<section>
 				<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-md);">
 					<h2 style="font-size: var(--text-2xl); margin: 0;">Products</h2>

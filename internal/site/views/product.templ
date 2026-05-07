@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jadams-positron/acai-sh-server/internal/domain/events"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/services"
@@ -15,6 +16,7 @@ type ProductShowProps struct {
 	Team     *teams.Team
 	Product  *products.Product
 	Overview *services.ProductOverview
+	Recents  []*events.Event
 }
 
 templ ProductShow(p ProductShowProps) {
@@ -29,6 +31,8 @@ templ ProductShow(p ProductShowProps) {
 		if p.Overview != nil && p.Overview.AggregateTotal > 0 {
 			@productOverviewBanner(p.Overview)
 		}
+
+		@recentActivity(p.Recents)
 
 		<div style="display: grid; gap: var(--space-xl);">
 			<section>

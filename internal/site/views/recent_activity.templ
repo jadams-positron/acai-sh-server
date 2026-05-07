@@ -1,0 +1,161 @@
+package views
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/jadams-positron/acai-sh-server/internal/domain/events"
+)
+
+// recentActivity renders the "Recent activity" strip used on team /
+// product / impl pages. Hidden entirely when the slice is empty so the
+// section doesn't show as a blank panel.
+templ recentActivity(es []*events.Event) {
+	if len(es) > 0 {
+		<section class="panel recent-activity">
+			<header style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: var(--space-md);">
+				<h2 style="font-size: var(--text-xl); margin: 0;">Recent activity</h2>
+				<span class="subtitle" style="font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.18em;">
+					{ pluralize(len(es), "event") }
+				</span>
+			</header>
+			<ul class="recent-activity-list">
+				for _, e := range es {
+					<li class="recent-activity-row">
+						<span class="recent-activity-actor">{ formatActor(e) }</span>
+						{ " " }
+						<span class="recent-activity-verb">{ formatVerb(e) }</span>
+						<span class="recent-activity-time" title={ e.InsertedAt.Format(time.RFC3339) }>
+							{ formatRelative(e.InsertedAt) }
+						</span>
+					</li>
+				}
+			</ul>
+		</section>
+	}
+}
+
+// formatActor returns a short label for the event's actor — either the
+// user's email local part, or "system" for unattributed events.
+func formatActor(e *events.Event) string {
+	if e.ActorEmail == nil || *e.ActorEmail == "" {
+		return "system"
+	}
+	email := *e.ActorEmail
+	if idx := indexAt(email); idx > 0 {
+		return email[:idx]
+	}
+	return email
+}
+
+// indexAt returns the index of the '@' character or -1.
+func indexAt(s string) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] == '@' {
+			return i
+		}
+	}
+	return -1
+}
+
+// formatVerb composes the human-readable middle of an activity row from
+// the event kind + payload. Kept conservative: we never panic on
+// missing payload fields, falling back to a generic phrase.
+func formatVerb(e *events.Event) string {
+	switch e.Kind {
+	case events.KindPushSpec:
+		feat := payloadString(e.Payload, "feature_name")
+		branch := payloadString(e.Payload, "branch")
+		if feat != "" && branch != "" {
+			return fmt.Sprintf("pushed spec for %s on %s", feat, branch)
+		}
+		if feat != "" {
+			return "pushed spec for " + feat
+		}
+		return "pushed a spec"
+	case events.KindPushRefs:
+		feat := payloadString(e.Payload, "feature_name")
+		count, _ := e.Payload["ref_count"].(float64)
+		if feat != "" && count > 0 {
+			return fmt.Sprintf("pushed %d refs to %s", int(count), feat)
+		}
+		if feat != "" {
+			return "pushed refs to " + feat
+		}
+		return "pushed refs"
+	case events.KindStatusChanged:
+		acid := payloadString(e.Payload, "acid")
+		to := payloadString(e.Payload, "to")
+		feat := ""
+		if e.FeatureName != nil {
+			feat = *e.FeatureName
+		}
+		switch {
+		case acid != "" && to != "" && feat != "":
+			return fmt.Sprintf("set %s on %s → %s", acid, feat, to)
+		case acid != "" && to != "":
+			return fmt.Sprintf("set %s → %s", acid, to)
+		case acid != "":
+			return "cleared " + acid
+		default:
+			return "updated a status"
+		}
+	case events.KindTokenMinted:
+		name := payloadString(e.Payload, "token_name")
+		if name != "" {
+			return "minted token " + name
+		}
+		return "minted a token"
+	case events.KindMemberAdded:
+		role := payloadString(e.Payload, "role")
+		if role != "" {
+			return "added a member as " + role
+		}
+		return "added a member"
+	case events.KindProductCreated:
+		name := payloadString(e.Payload, "product_name")
+		if name != "" {
+			return "created product " + name
+		}
+		return "created a product"
+	case events.KindImplCreated:
+		name := payloadString(e.Payload, "impl_name")
+		if name != "" {
+			return "created impl " + name
+		}
+		return "created an implementation"
+	default:
+		return e.Kind
+	}
+}
+
+// payloadString safely projects a string field from the JSON payload map.
+func payloadString(m map[string]any, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
+
+// formatRelative returns a short "Xm ago" / "Xh ago" / "Xd ago" string.
+// Falls through to an absolute date for events older than ~1 month.
+func formatRelative(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	d := time.Since(t)
+	switch {
+	case d < 30*time.Second:
+		return "just now"
+	case d < time.Minute:
+		return fmt.Sprintf("%ds ago", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	case d < 30*24*time.Hour:
+		return fmt.Sprintf("%dd ago", int(d.Hours()/24))
+	default:
+		return t.Format("2006-01-02")
+	}
+}

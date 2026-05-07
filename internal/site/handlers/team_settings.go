@@ -9,6 +9,7 @@ import (
 
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/events"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/site/views"
 )
@@ -18,6 +19,7 @@ type TeamSettingsDeps struct {
 	Logger   *slog.Logger
 	Teams    *teams.Repository
 	Accounts *accounts.Repository
+	Events   *events.Repository
 }
 
 // loadTeamAndCheckOwner is a helper that loads the team by name, verifies the
@@ -142,6 +144,21 @@ func TeamSettingsAddMember(d *TeamSettingsDeps) echo.HandlerFunc {
 			}
 			c.Response().WriteHeader(http.StatusUnprocessableEntity)
 			return renderTeamSettings(c, d, team, role, flash, "error")
+		}
+
+		actorID := scope.User.ID
+		addedID := user.ID
+		if err := d.Events.Emit(c.Request().Context(), events.EmitParams{
+			TeamID:      team.ID,
+			ActorUserID: &actorID,
+			Kind:        events.KindMemberAdded,
+			Payload: map[string]any{
+				"user_id": addedID,
+				"role":    inviteRole,
+				"email":   user.Email,
+			},
+		}); err != nil {
+			d.Logger.Warn("team settings: events.Emit member.added", "error", err)
 		}
 
 		return c.Redirect(http.StatusSeeOther, "/t/"+team.Name+"/settings")
