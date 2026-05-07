@@ -1,0 +1,45 @@
+package views
+
+// CLIInstallProps drives the cliInstallSteps component — a numbered set
+// of steps for getting from "fresh user" to "ran acai push." Used in the
+// team-page no-products empty state, the tokens-page no-tokens empty
+// state, and the post-token-mint next-step block. The presence of
+// PlaintextToken switches step 2 from "mint a token" to "drop the token
+// you just minted into your .env".
+type CLIInstallProps struct {
+	TeamName       string
+	APIBaseURL     string
+	PlaintextToken string // when set, step 2 collapses into a copy-pasteable env-var snippet
+	ProductName    string // when set, step 3's `acai push` shows --product=<name>; defaults to <name> placeholder
+}
+
+templ cliInstallSteps(p CLIInstallProps) {
+	<ol class="install-steps">
+		<li>
+			<span class="install-step-label">Install the CLI</span>
+			<code class="empty-state-snippet">npm install -g @acai.sh/cli</code>
+		</li>
+		<li>
+			if p.PlaintextToken != "" {
+				<span class="install-step-label">Drop these env vars in your repo's <code>.env</code></span>
+				<code class="empty-state-snippet">{ "ACAI_API_BASE_URL=" + p.APIBaseURL }
+{ "ACAI_API_TOKEN=" + p.PlaintextToken }</code>
+				<p class="install-step-meta">The token is shown only once — copy it now.</p>
+			} else {
+				<span class="install-step-label">
+					<a href={ templ.SafeURL("/t/" + p.TeamName + "/tokens") }>Mint an API token</a>
+				</span>
+				<p class="install-step-meta">You'll see the plaintext exactly once. Copy it into a <code>.env</code> alongside <code>ACAI_API_BASE_URL={ p.APIBaseURL }</code>.</p>
+			}
+		</li>
+		<li>
+			<span class="install-step-label">Push from your repo</span>
+			if p.ProductName != "" {
+				<code class="empty-state-snippet">{ "acai push --product " + p.ProductName + " --all" }</code>
+			} else {
+				<code class="empty-state-snippet">{ "acai push --product <product-name> --all" }</code>
+			}
+			<p class="install-step-meta">Run from the repo root, on the branch you want to track. The CLI auto-creates an implementation per branch.</p>
+		</li>
+	</ol>
+}

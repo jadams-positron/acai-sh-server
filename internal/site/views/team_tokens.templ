@@ -24,11 +24,19 @@ templ TeamTokens(p TeamTokensProps) {
 			<h1 class="title">API Tokens</h1>
 		</header>
 		if p.NewlyCreatedToken != "" {
-			<div class="banner banner-success" style="font-family: var(--font-mono, monospace); word-break: break-all;">
+			<div class="banner banner-success" style="font-family: var(--font-mono, monospace); word-break: break-all; margin-bottom: var(--space-md);">
 				<strong>Save this token — you will not see it again:</strong>
 				<br/>
 				{ p.NewlyCreatedToken }
 			</div>
+			<section class="panel" style="margin-bottom: var(--space-xl);">
+				<h2 style="font-size: var(--text-xl); margin: 0 0 var(--space-md);">Next steps</h2>
+				@cliInstallSteps(CLIInstallProps{
+					TeamName:       p.Team.Name,
+					APIBaseURL:     p.APIBaseURL,
+					PlaintextToken: p.NewlyCreatedToken,
+				})
+			</section>
 		}
 		if p.Flash != "" {
 			if p.FlashType == "success" {
@@ -48,11 +56,12 @@ templ TeamTokens(p TeamTokensProps) {
 				if len(p.Tokens) == 0 {
 					<div class="empty-state empty-state-rich">
 						<p class="empty-state-headline">No tokens yet</p>
-						<p>The <code>acai</code> CLI uses an API token to push specs and read state. Create one here, then drop it into the <code>.env</code> of any repo you want to sync:</p>
-						<code class="empty-state-snippet">ACAI_API_BASE_URL={ p.APIBaseURL }
-ACAI_API_TOKEN=&lt;paste-the-token-once-it's-shown&gt;</code>
-						<p class="subtitle">The plaintext token is shown <strong>exactly once</strong> after creation — copy it then.</p>
-						<div>
+						<p>The <code>acai</code> CLI uses an API token to push specs and read state. Mint one here, then drop it into a repo's <code>.env</code>:</p>
+						@cliInstallSteps(CLIInstallProps{
+							TeamName:   p.Team.Name,
+							APIBaseURL: p.APIBaseURL,
+						})
+						<div style="border-top: 1px solid var(--border-subtle); padding-top: var(--space-md); margin-top: var(--space-sm);">
 							<button class="button button-primary" data-on-click="$showCreateModal = true" type="button">
 								+ Create Token
 							</button>
