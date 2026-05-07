@@ -807,6 +807,46 @@ code {
     white-space: pre;
 }
 
+/* === Recent activity strip === */
+.recent-activity {
+    padding: var(--space-md) var(--space-lg);
+}
+
+.recent-activity-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 6px;
+}
+
+.recent-activity-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    font-size: var(--text-sm);
+    color: var(--muted);
+}
+
+.recent-activity-actor {
+    color: var(--fg);
+    font-weight: 500;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+}
+
+.recent-activity-verb {
+    flex: 1;
+    color: var(--fg);
+}
+
+.recent-activity-time {
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--text-xs);
+    white-space: nowrap;
+}
+
 /* === Cmd+K palette === */
 .palette-backdrop {
     position: fixed;

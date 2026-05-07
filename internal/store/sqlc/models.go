@@ -38,6 +38,18 @@ type EmailToken struct {
 	InsertedAt string
 }
 
+type Event struct {
+	ID          string
+	TeamID      string
+	ProductID   *string
+	ImplID      *string
+	FeatureName *string
+	ActorUserID *string
+	Kind        string
+	Payload     string
+	InsertedAt  string
+}
+
 type FeatureBranchRef struct {
 	ID          string
 	BranchID    string

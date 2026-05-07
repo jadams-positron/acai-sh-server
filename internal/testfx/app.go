@@ -14,6 +14,7 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/config"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/events"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	domainspecs "github.com/jadams-positron/acai-sh-server/internal/domain/specs"
@@ -77,6 +78,7 @@ func NewApp(t *testing.T, opts NewAppOpts) *App {
 	productsRepo := products.NewRepository(db)
 	implsRepo := implementations.NewRepository(db)
 	specsRepo := domainspecs.NewRepository(db)
+	eventsRepo := events.NewRepository(db)
 	sessionStore := auth.NewSessionStore(cfg.SecretKeyBase, false)
 	mlSvc := auth.NewMagicLinkService(accountsRepo, "http://localhost")
 	mailer := &captureMailer{}
@@ -98,6 +100,7 @@ func NewApp(t *testing.T, opts NewAppOpts) *App {
 		Products:        productsRepo,
 		Implementations: implsRepo,
 		Specs:           specsRepo,
+		Events:          eventsRepo,
 		Operations:      operations.Load(opts.NonProdLimits || cfg.URLScheme == "http"),
 		APILimiter:      middleware.NewInProcessLimiter(),
 		AuthHandlerDeps: authDeps,

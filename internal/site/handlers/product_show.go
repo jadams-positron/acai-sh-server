@@ -7,6 +7,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/events"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/specs"
@@ -23,6 +24,7 @@ type ProductShowDeps struct {
 	Implementations *implementations.Repository
 	Specs           *specs.Repository
 	FeatureView     *services.FeatureViewService
+	Events          *events.Repository
 }
 
 // ProductShow renders GET /t/:team_name/p/:product_name.
@@ -66,6 +68,12 @@ func ProductShow(d *ProductShowDeps) echo.HandlerFunc {
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load product overview")
 		}
 
+		productID := prod.ID
+		recents, _ := d.Events.RecentForScope(c.Request().Context(), events.Scope{
+			TeamID:    team.ID,
+			ProductID: &productID,
+		}, 5)
+
 		shell, err := buildShellChrome(c, d.Teams, prod.Name+" · "+team.Name, team, "overview", []views.Crumb{
 			{Label: "Teams", HRef: "/teams"},
 			{Label: team.Name, HRef: "/t/" + team.Name},
@@ -81,6 +89,7 @@ func ProductShow(d *ProductShowDeps) echo.HandlerFunc {
 			Team:     team,
 			Product:  prod,
 			Overview: overview,
+			Recents:  recents,
 		}).Render(c.Request().Context(), c.Response())
 	}
 }

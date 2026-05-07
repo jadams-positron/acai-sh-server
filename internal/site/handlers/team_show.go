@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/events"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/services"
@@ -20,6 +21,7 @@ type TeamShowDeps struct {
 	Teams       *teams.Repository
 	Products    *products.Repository
 	FeatureView *services.FeatureViewService
+	Events      *events.Repository
 }
 
 // TeamShow renders GET /t/:team_name.
@@ -69,6 +71,11 @@ func TeamShow(d *TeamShowDeps) echo.HandlerFunc {
 			}
 		}
 
+		// Best-effort recent activity — never block the page on this query.
+		recents, _ := d.Events.RecentForScope(c.Request().Context(), events.Scope{
+			TeamID: team.ID,
+		}, 5)
+
 		members, err := d.Teams.ListMembers(c.Request().Context(), team.ID)
 		if err != nil {
 			d.Logger.Error("team show: ListMembers", "error", err)
@@ -90,6 +97,7 @@ func TeamShow(d *TeamShowDeps) echo.HandlerFunc {
 			Products:   prods,
 			Heatmap:    heatmap,
 			Members:    members,
+			Recents:    recents,
 			CSRFToken:  csrfTokenFromEcho(c),
 			APIBaseURL: c.Scheme() + "://" + c.Request().Host + "/api/v1",
 		}).Render(c.Request().Context(), c.Response())
@@ -151,6 +159,18 @@ func TeamCreateProduct(d *TeamShowDeps) echo.HandlerFunc {
 				Flash:                flash,
 				PrefilledProductName: name,
 			}).Render(c.Request().Context(), c.Response())
+		}
+
+		actorID := scope.User.ID
+		productID := prod.ID
+		if err := d.Events.Emit(c.Request().Context(), events.EmitParams{
+			TeamID:      team.ID,
+			ProductID:   &productID,
+			ActorUserID: &actorID,
+			Kind:        events.KindProductCreated,
+			Payload:     map[string]any{"product_name": prod.Name},
+		}); err != nil {
+			d.Logger.Warn("team show: events.Emit product.created", "error", err)
 		}
 
 		return c.Redirect(http.StatusSeeOther, "/t/"+team.Name+"/p/"+prod.Name)

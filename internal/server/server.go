@@ -20,6 +20,7 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
 	"github.com/jadams-positron/acai-sh-server/internal/config"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/events"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/implementations"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/products"
 	domainspecs "github.com/jadams-positron/acai-sh-server/internal/domain/specs"
@@ -43,6 +44,7 @@ type RouterDeps struct {
 	Products        *products.Repository
 	Implementations *implementations.Repository
 	Specs           *domainspecs.Repository
+	Events          *events.Repository
 	Operations      *operations.Config
 	APILimiter      apimiddleware.Limiter
 }
@@ -99,6 +101,7 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Teams:       deps.Teams,
 		Products:    deps.Products,
 		FeatureView: featureViewSvc,
+		Events:      deps.Events,
 	}
 	site.MountTeamShowRoutes(browser, teamShowDeps, csrfMW)
 	productShowDeps := &handlers.ProductShowDeps{
@@ -108,6 +111,7 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Implementations: deps.Implementations,
 		Specs:           deps.Specs,
 		FeatureView:     featureViewSvc,
+		Events:          deps.Events,
 	}
 	site.MountProductShowRoutes(browser, productShowDeps, csrfMW)
 	featureShowDeps := &handlers.FeatureShowDeps{
@@ -123,6 +127,8 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		FeatureView:     featureViewSvc,
 		FeatureStates:   featureStatesSvc,
 		Implementations: deps.Implementations,
+		Specs:           deps.Specs,
+		Events:          deps.Events,
 	}
 	site.MountImplFeatureShowRoutes(browser, implFeatureShowDeps, csrfMW)
 	implsIndexDeps := &handlers.ImplsIndexDeps{
@@ -138,6 +144,7 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Implementations: deps.Implementations,
 		Specs:           deps.Specs,
 		FeatureView:     featureViewSvc,
+		Events:          deps.Events,
 	}
 	site.MountImplShowRoutes(browser, implShowDeps, csrfMW)
 	featuresIndexDeps := &handlers.FeaturesIndexDeps{
@@ -167,11 +174,13 @@ func New(cfg *config.Config, logger *slog.Logger, deps *RouterDeps) (*Server, er
 		Logger:   logger,
 		Teams:    deps.Teams,
 		Accounts: deps.Accounts,
+		Events:   deps.Events,
 	}
 	site.MountTeamSettingsRoutes(browser, teamSettingsDeps, csrfMW)
 	teamTokensDeps := &handlers.TeamTokensDeps{
 		Logger: logger,
 		Teams:  deps.Teams,
+		Events: deps.Events,
 	}
 	site.MountTeamTokensRoutes(browser, teamTokensDeps, csrfMW)
 

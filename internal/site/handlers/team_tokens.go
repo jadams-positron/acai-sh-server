@@ -9,6 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/domain/events"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/teams"
 	"github.com/jadams-positron/acai-sh-server/internal/site/views"
 )
@@ -17,6 +18,7 @@ import (
 type TeamTokensDeps struct {
 	Logger *slog.Logger
 	Teams  *teams.Repository
+	Events *events.Repository
 }
 
 // loadTeamAsMember is a helper that loads the team by name and checks that the
@@ -134,6 +136,16 @@ func TeamTokensCreate(d *TeamTokensDeps) echo.HandlerFunc {
 			d.Logger.Error("team tokens: CreateAccessToken", "error", err)
 			c.Response().WriteHeader(http.StatusInternalServerError)
 			return renderTeamTokens(c, d, team, "Failed to create token. Please try again.", "error", "")
+		}
+
+		actorID := scope.User.ID
+		if err := d.Events.Emit(c.Request().Context(), events.EmitParams{
+			TeamID:      team.ID,
+			ActorUserID: &actorID,
+			Kind:        events.KindTokenMinted,
+			Payload:     map[string]any{"token_name": name},
+		}); err != nil {
+			d.Logger.Warn("team tokens: events.Emit", "error", err)
 		}
 
 		// Render directly (no redirect) so we can show the plaintext once.
