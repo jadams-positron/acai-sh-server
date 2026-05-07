@@ -807,6 +807,46 @@ code {
     white-space: pre;
 }
 
+/* === Inline status select (ACID drilldown) === */
+.status-select {
+    background: rgba(var(--color-accent-rgb), 0.06);
+    border: 1px solid rgba(var(--color-accent-rgb), 0.25);
+    border-radius: var(--radius-pill);
+    color: var(--accent);
+    font: inherit;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 2px var(--space-sm);
+    text-transform: uppercase;
+    cursor: pointer;
+    transition:
+        border-color 0.15s ease,
+        background 0.15s ease;
+}
+
+.status-select:hover {
+    border-color: var(--accent);
+}
+
+.status-select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(var(--color-accent-rgb), 0.2);
+}
+
+.status-select-success {
+    color: var(--success);
+    border-color: rgba(var(--color-success-rgb), 0.5);
+    background: rgba(var(--color-success-rgb), 0.08);
+}
+
+.status-select-danger {
+    color: var(--danger);
+    border-color: rgba(var(--color-danger-rgb), 0.55);
+    background: rgba(var(--color-danger-rgb), 0.08);
+}
+
 /* === Snippet with copy button === */
 .snippet-with-copy {
     position: relative;
