@@ -8,6 +8,7 @@ import (
 	"github.com/jadams-positron/acai-sh-server/internal/api/middleware"
 	"github.com/jadams-positron/acai-sh-server/internal/api/operations"
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/auth/google"
 	"github.com/jadams-positron/acai-sh-server/internal/config"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/events"
@@ -62,6 +63,32 @@ func runServe(ctx context.Context, stderr io.Writer) int {
 
 	mailer := mail.NewFromConfig(cfg, logger)
 
+	// Optional Google SSO. When the env vars aren't set, googleProvider
+	// stays nil and the login page hides the Google button. OIDC discovery
+	// hits accounts.google.com once at startup; we fail-fast on misconfig.
+	var googleProvider *google.Provider
+	if cfg.GoogleAuthEnabled() {
+		redirect := cfg.GoogleAuthRedirectURL
+		if redirect == "" {
+			redirect = baseURL + "/auth/google/callback"
+		}
+		gp, err := google.NewProvider(ctx, google.Config{
+			ClientID:        cfg.GoogleAuthClientID,
+			ClientSecret:    cfg.GoogleAuthClientSecret,
+			RedirectURL:     redirect,
+			AllowedDomains:  cfg.GoogleAuthAllowedDomains,
+			AllowedEmails:   cfg.GoogleAuthAllowedEmails,
+			AllowedSubjects: cfg.GoogleAuthAllowedSubjects,
+			PostLoginURL:    "/teams",
+		})
+		if err != nil {
+			_, _ = fmt.Fprintf(stderr, "google auth: %v\n", err)
+			return 1
+		}
+		googleProvider = gp
+		logger.Info("google sso enabled", "redirect_url", redirect, "allowed_domains", cfg.GoogleAuthAllowedDomains)
+	}
+
 	authDeps := &handlers.AuthDeps{
 		Logger:    logger,
 		Sessions:  sessionStore,
@@ -70,6 +97,7 @@ func runServe(ctx context.Context, stderr io.Writer) int {
 		Mailer:    mailer,
 		FromEmail: cfg.MailFromEmail,
 		FromName:  cfg.MailFromName,
+		Google:    googleProvider,
 	}
 
 	srv, err := server.New(cfg, logger, &server.RouterDeps{

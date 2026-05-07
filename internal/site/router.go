@@ -24,6 +24,16 @@ func MountAuthRoutes(g *echo.Group, deps *handlers.AuthDeps, csrfMiddleware echo
 	// Magic-link consume — bypasses CSRF (token IS the proof).
 	g.GET("/users/log-in/:token", handlers.LoginConfirm(deps))
 
+	// Google SSO. Login starts the redirect (CSRF protected — same-origin
+	// form submit from the login page). Callback is the OIDC redirect from
+	// Google itself, so it bypasses our CSRF middleware; defends in depth
+	// via the state cookie + the OIDC nonce.
+	if deps.Google != nil {
+		unauthGoogle := g.Group("", csrfMiddleware, auth.RedirectIfAuth)
+		unauthGoogle.POST("/auth/google/login", handlers.GoogleLogin(deps))
+		g.GET("/auth/google/callback", handlers.GoogleCallback(deps))
+	}
+
 	// Logout (CSRF protected).
 	logout := g.Group("", csrfMiddleware)
 	logout.POST("/users/log-out", handlers.LogOut(deps))

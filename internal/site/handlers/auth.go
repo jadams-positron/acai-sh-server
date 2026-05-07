@@ -4,10 +4,12 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
 	"github.com/jadams-positron/acai-sh-server/internal/auth"
+	"github.com/jadams-positron/acai-sh-server/internal/auth/google"
 	"github.com/jadams-positron/acai-sh-server/internal/domain/accounts"
 	"github.com/jadams-positron/acai-sh-server/internal/mail"
 	"github.com/jadams-positron/acai-sh-server/internal/site/views"
@@ -22,6 +24,11 @@ type AuthDeps struct {
 	Mailer    mail.Mailer
 	FromEmail string
 	FromName  string
+
+	// Google is set when GOOGLE_AUTH_CLIENT_ID/SECRET are configured. When
+	// nil, the /auth/google/* routes are not mounted and the login page
+	// hides the Google button.
+	Google *google.Provider
 }
 
 // csrfTokenFromEcho returns the CSRF token that echo's CSRF middleware injected.
@@ -33,11 +40,12 @@ func csrfTokenFromEcho(c echo.Context) string {
 }
 
 // LoginNew GETs the login form.
-func LoginNew(_ *AuthDeps) echo.HandlerFunc {
+func LoginNew(d *AuthDeps) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 		return views.LoginPage(views.LoginPageProps{
-			CSRFToken: csrfTokenFromEcho(c),
+			CSRFToken:     csrfTokenFromEcho(c),
+			GoogleEnabled: d.Google != nil,
 		}).Render(c.Request().Context(), c.Response())
 	}
 }
@@ -109,6 +117,128 @@ func LogOut(d *AuthDeps) echo.HandlerFunc {
 	}
 }
 
+// googleStateCookieName is the short-lived cookie that carries the
+// OAuth state, nonce, and return_to between /auth/google/login and
+// /auth/google/callback. We use a cookie (HttpOnly, SameSite=Lax,
+// Secure when HTTPS) rather than the main session because the login
+// flow doesn't have a session yet.
+const googleStateCookieName = "_acai_oauth_state"
+
+// GoogleLogin redirects to Google. POSTed (so the magic-link form's
+// "Sign in with Google" button can submit it via a same-origin form),
+// CSRF-protected by the existing site middleware. Generates state and
+// nonce, stores them in a short-lived cookie, then 303s to Google.
+func GoogleLogin(d *AuthDeps) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if d.Google == nil {
+			return echo.NewHTTPError(http.StatusNotFound, "google sign-in not configured")
+		}
+		state, err := google.RandString(32)
+		if err != nil {
+			d.Logger.Error("google login: rand state", "error", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed")
+		}
+		nonce, err := google.RandString(32)
+		if err != nil {
+			d.Logger.Error("google login: rand nonce", "error", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed")
+		}
+		returnTo := google.SafeReturnTo(c.QueryParam("return_to"), "/teams")
+		// Secure is conditional on c.Scheme() rather than always-true so
+		// that local HTTP dev works; gosec G124 flags this but production
+		// is HTTPS where Secure flips on automatically.
+		c.SetCookie(&http.Cookie{ //nolint:gosec // Secure intentionally tied to URL scheme
+			Name:     googleStateCookieName,
+			Value:    state + "|" + nonce + "|" + returnTo,
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   c.Scheme() == "https",
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   600, // 10 minutes — Google flow always finishes faster
+		})
+		return c.Redirect(http.StatusFound, d.Google.AuthCodeURL(state, nonce))
+	}
+}
+
+// GoogleCallback consumes the auth-code redirect from Google. CSRF
+// middleware MUST be skipped on this route — Google can't include our
+// CSRF token. Defends in depth via the state cookie + the OIDC nonce.
+func GoogleCallback(d *AuthDeps) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		if d.Google == nil {
+			return echo.NewHTTPError(http.StatusNotFound, "google sign-in not configured")
+		}
+		code := c.QueryParam("code")
+		state := c.QueryParam("state")
+		if code == "" || state == "" {
+			return echo.NewHTTPError(http.StatusBadRequest, "missing code or state")
+		}
+
+		cookie, err := c.Cookie(googleStateCookieName)
+		if err != nil || cookie.Value == "" {
+			return echo.NewHTTPError(http.StatusBadRequest, "missing state cookie")
+		}
+		// Cookie is "state|nonce|return_to" — opaque token, untrusted; we
+		// validate state matches and treat return_to via SafeReturnTo.
+		parts := strings.SplitN(cookie.Value, "|", 3)
+		if len(parts) != 3 {
+			return echo.NewHTTPError(http.StatusBadRequest, "malformed state cookie")
+		}
+		expectedState, expectedNonce, returnTo := parts[0], parts[1], parts[2]
+		if state != expectedState {
+			return echo.NewHTTPError(http.StatusBadRequest, "state mismatch")
+		}
+
+		// Clear the state cookie immediately — single-use.
+		c.SetCookie(&http.Cookie{ //nolint:gosec // Secure intentionally tied to URL scheme; clearing cookie
+			Name:     googleStateCookieName,
+			Value:    "",
+			Path:     "/",
+			HttpOnly: true,
+			Secure:   c.Scheme() == "https",
+			SameSite: http.SameSiteLaxMode,
+			MaxAge:   -1,
+		})
+
+		claims, err := d.Google.Exchange(c.Request().Context(), code, expectedNonce)
+		if err != nil {
+			d.Logger.Warn("google callback: exchange", "error", err)
+			return echo.NewHTTPError(http.StatusBadRequest, "code exchange failed")
+		}
+		if err := d.Google.Authorize(claims); err != nil {
+			d.Logger.Warn("google callback: not in allowlist", "email", claims.Email, "hd", claims.HD)
+			return echo.NewHTTPError(http.StatusForbidden, "not allowed")
+		}
+
+		// Look up or create the user. Google has verified the email so
+		// MarkConfirmed unconditionally.
+		user, err := d.Accounts.GetUserByEmail(c.Request().Context(), claims.Email)
+		switch {
+		case err == nil:
+			// existing user
+		case accounts.IsNotFound(err):
+			user, err = d.Accounts.CreateUser(c.Request().Context(), accounts.CreateUserParams{
+				Email: claims.Email,
+			})
+			if err != nil {
+				d.Logger.Error("google callback: create user", "error", err)
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed")
+			}
+		default:
+			d.Logger.Error("google callback: lookup user", "error", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed")
+		}
+		if err := d.Accounts.MarkConfirmed(c.Request().Context(), user.ID); err != nil {
+			d.Logger.Warn("google callback: mark confirmed", "error", err)
+		}
+		if err := d.Sessions.Login(c, user.ID); err != nil {
+			d.Logger.Error("google callback: save session", "error", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed")
+		}
+		return c.Redirect(http.StatusSeeOther, google.SafeReturnTo(returnTo, "/teams"))
+	}
+}
+
 // RegisterNew GETs the sign-up form.
 func RegisterNew(_ *AuthDeps) echo.HandlerFunc {
 	return func(c echo.Context) error {
@@ -163,11 +293,12 @@ func RegisterCreate(d *AuthDeps) echo.HandlerFunc {
 	}
 }
 
-func renderLoginWithFlash(c echo.Context, _ *AuthDeps, flash string) error {
+func renderLoginWithFlash(c echo.Context, d *AuthDeps, flash string) error {
 	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 	return views.LoginPage(views.LoginPageProps{
-		Flash:     flash,
-		CSRFToken: csrfTokenFromEcho(c),
+		Flash:         flash,
+		CSRFToken:     csrfTokenFromEcho(c),
+		GoogleEnabled: d.Google != nil,
 	}).Render(c.Request().Context(), c.Response())
 }
 

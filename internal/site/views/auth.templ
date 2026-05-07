@@ -2,8 +2,9 @@ package views
 
 // LoginPageProps configures LoginPage rendering.
 type LoginPageProps struct {
-	Flash     string
-	CSRFToken string
+	Flash         string
+	CSRFToken     string
+	GoogleEnabled bool // true when GOOGLE_AUTH_CLIENT_ID is configured
 }
 
 templ LoginPage(p LoginPageProps) {
@@ -15,13 +16,24 @@ templ LoginPage(p LoginPageProps) {
 			if p.Flash != "" {
 				<div class="banner banner-error">{ p.Flash }</div>
 			}
+			if p.GoogleEnabled {
+				<form method="post" action="/auth/google/login" class="form" style="margin-bottom: var(--space-md);">
+					<input type="hidden" name="gorilla.csrf.Token" value={ p.CSRFToken }/>
+					<button class="button button-primary button-block" type="submit">
+						Sign in with Google
+					</button>
+				</form>
+				<div class="form-divider">
+					<span>or</span>
+				</div>
+			}
 			<form method="post" action="/users/log-in" class="form">
 				<input type="hidden" name="gorilla.csrf.Token" value={ p.CSRFToken }/>
 				<div class="form-field">
 					<label class="form-label" for="login-email">Email</label>
 					<input id="login-email" class="form-input" type="email" name="email" required autofocus placeholder="you@example.com"/>
 				</div>
-				<button class="button button-primary button-block" type="submit">
+				<button class="button button-ghost button-block" type="submit">
 					Send magic link
 				</button>
 			</form>
