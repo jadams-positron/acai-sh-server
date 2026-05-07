@@ -17,6 +17,7 @@ type ImplFeatureProps struct {
 	FeatureName    string
 	Acids          []*services.ACIDEntry
 	HasSpec        bool
+	CSRFToken      string // for inline status edit form submissions
 }
 
 templ ImplFeature(p ImplFeatureProps) {
@@ -51,7 +52,7 @@ templ ImplFeature(p ImplFeatureProps) {
 					</thead>
 					<tbody>
 						for _, a := range p.Acids {
-							@acidRow(a)
+							@acidRow(p.Team.Name, p.ImplSlug, p.FeatureName, p.CSRFToken, a)
 						}
 					</tbody>
 				</table>
@@ -60,7 +61,7 @@ templ ImplFeature(p ImplFeatureProps) {
 	}
 }
 
-templ acidRow(a *services.ACIDEntry) {
+templ acidRow(teamName, implSlug, featureName, csrfToken string, a *services.ACIDEntry) {
 	<tr style="border-top: 1px solid var(--border-subtle);">
 		<td style="padding: var(--space-md); font-family: var(--font-mono); font-size: var(--text-sm);">
 			<button
@@ -76,7 +77,7 @@ templ acidRow(a *services.ACIDEntry) {
 			}
 		</td>
 		<td style="padding: var(--space-md);">
-			@statusPill(a.Status)
+			@statusSelect(teamName, implSlug, featureName, csrfToken, a.ACID, a.Status)
 		</td>
 		<td style="padding: var(--space-md); text-align: right; color: var(--muted); font-size: var(--text-sm);">
 			if a.RefsCount > 0 || a.TestRefsCount > 0 {
@@ -108,14 +109,59 @@ templ acidRow(a *services.ACIDEntry) {
 	}
 }
 
-templ statusPill(status *string) {
-	if status == nil {
-		<span class="badge">untouched</span>
-	} else if *status == "completed" || *status == "accepted" {
-		<span class="badge" style="border-color: var(--success); color: var(--success);">{ *status }</span>
-	} else if *status == "blocked" || *status == "rejected" {
-		<span class="badge" style="border-color: var(--danger); color: var(--danger);">{ *status }</span>
+// statusSelect renders the inline status editor — a tiny <select> bound
+// to a same-origin POST that writes via FeatureStatesService.Update.
+// `data-on-change` submits via the wrapping form. The current status
+// drives both the selected option and the visual tone of the select
+// itself (success / danger / accent border) so it reads similar to the
+// old static badge.
+templ statusSelect(teamName, implSlug, featureName, csrfToken, acid string, status *string) {
+	<form
+		method="post"
+		action={ templ.SafeURL("/t/" + teamName + "/i/" + implSlug + "/f/" + featureName + "/acid/" + acid + "/status") }
+		style="display: inline-block; margin: 0;"
+	>
+		<input type="hidden" name="gorilla.csrf.Token" value={ csrfToken }/>
+		<select
+			name="status"
+			class={ statusSelectClass(status) }
+			data-on-change="evt.target.form.submit()"
+		>
+			if status == nil {
+				<option value="" selected>untouched</option>
+			} else {
+				<option value="">untouched</option>
+			}
+			@statusOption("assigned", status)
+			@statusOption("incomplete", status)
+			@statusOption("blocked", status)
+			@statusOption("completed", status)
+			@statusOption("accepted", status)
+			@statusOption("rejected", status)
+		</select>
+	</form>
+}
+
+templ statusOption(value string, current *string) {
+	if current != nil && *current == value {
+		<option value={ value } selected>{ value }</option>
 	} else {
-		<span class="badge">{ *status }</span>
+		<option value={ value }>{ value }</option>
+	}
+}
+
+// statusSelectClass picks the visual tone of the inline select based on
+// the ACID's current status, matching the old statusPill colour mapping.
+func statusSelectClass(status *string) string {
+	if status == nil {
+		return "status-select"
+	}
+	switch *status {
+	case "completed", "accepted":
+		return "status-select status-select-success"
+	case "blocked", "rejected":
+		return "status-select status-select-danger"
+	default:
+		return "status-select"
 	}
 }

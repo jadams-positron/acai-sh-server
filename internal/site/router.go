@@ -59,6 +59,7 @@ func MountFeatureShowRoutes(g *echo.Group, deps *handlers.FeatureShowDeps, csrfM
 func MountImplFeatureShowRoutes(g *echo.Group, deps *handlers.ImplFeatureShowDeps, csrfMiddleware echo.MiddlewareFunc) {
 	authd := g.Group("", csrfMiddleware, auth.RequireAuth)
 	authd.GET("/t/:team_name/i/:impl_slug/f/:feature_name", handlers.ImplFeatureShow(deps))
+	authd.POST("/t/:team_name/i/:impl_slug/f/:feature_name/acid/:acid/status", handlers.ImplFeatureSetStatus(deps))
 }
 
 // MountImplsIndexRoutes registers the /t/:team_name/implementations route.

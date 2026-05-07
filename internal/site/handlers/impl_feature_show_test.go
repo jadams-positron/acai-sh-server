@@ -2,6 +2,7 @@ package handlers_test
 
 import (
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -135,6 +136,69 @@ func TestImplFeatureShow_RendersACIDTable(t *testing.T) {
 	// The breadcrumb should include the team and impl name.
 	if !strings.Contains(body, "acid-team") {
 		t.Errorf("expected team name in breadcrumb; got %.500s", body)
+	}
+}
+
+func TestImplFeatureSetStatus_HappyPath_Redirects(t *testing.T) {
+	app := testfx.NewApp(t, testfx.NewAppOpts{})
+	user := testfx.SeedUser(t, app.DB, testfx.SeedUserOpts{Email: "set-status@test.example"})
+	team := testfx.SeedTeam(t, app.DB, testfx.SeedTeamOpts{Name: "setstatus-team"})
+	testfx.SeedUserTeamRole(t, app.DB, user, team, "owner")
+	product := testfx.SeedProduct(t, app.DB, team, testfx.SeedProductOpts{Name: "p"})
+	impl := testfx.SeedImplementation(t, app.DB, product, testfx.SeedImplementationOpts{Name: "i"})
+	branch := testfx.SeedBranch(t, app.DB, team, testfx.SeedBranchOpts{RepoURI: "github.com/test/r"})
+	testfx.SeedTrackedBranch(t, app.DB, impl, branch)
+	testfx.SeedSpec(t, app.DB, product, branch, testfx.SeedSpecOpts{
+		FeatureName: "f",
+		Requirements: map[string]any{
+			"AC-1": map[string]any{"requirement": "first"},
+		},
+	})
+
+	slug := makeImplSlug(impl)
+	client := testfx.LoggedInClient(t, app, user)
+	csrfToken, postClient := getCSRFToken(t, client, "/t/setstatus-team/i/"+slug+"/f/f")
+
+	statusURL := "/t/setstatus-team/i/" + slug + "/f/f/acid/AC-1/status"
+	resp := postClient.POSTForm(statusURL, url.Values{
+		"status":             {"completed"},
+		"gorilla.csrf.Token": {csrfToken},
+	})
+	if resp.Status() != http.StatusSeeOther {
+		t.Fatalf("expected 303 redirect; got %d, body=%.500s", resp.Status(), resp.Body())
+	}
+	if loc := resp.Header("Location"); loc != "/t/setstatus-team/i/"+slug+"/f/f" {
+		t.Errorf("Location = %q; want drilldown URL", loc)
+	}
+
+	// Re-fetch the page; AC-1 should now appear in completed-status form.
+	getResp := client.GET("/t/setstatus-team/i/"+slug+"/f/f", nil)
+	getResp.AssertStatus(http.StatusOK)
+	body := string(getResp.Body())
+	// The new select-based status renders <option value="completed" selected>.
+	if !strings.Contains(body, `value="completed" selected`) {
+		t.Errorf("expected completed option to be selected; got %.800s", body)
+	}
+}
+
+func TestImplFeatureSetStatus_InvalidStatus_422(t *testing.T) {
+	app := testfx.NewApp(t, testfx.NewAppOpts{})
+	user := testfx.SeedUser(t, app.DB, testfx.SeedUserOpts{Email: "bad-status@test.example"})
+	team := testfx.SeedTeam(t, app.DB, testfx.SeedTeamOpts{Name: "badstatus-team"})
+	testfx.SeedUserTeamRole(t, app.DB, user, team, "owner")
+	product := testfx.SeedProduct(t, app.DB, team, testfx.SeedProductOpts{Name: "p"})
+	impl := testfx.SeedImplementation(t, app.DB, product, testfx.SeedImplementationOpts{Name: "i"})
+
+	slug := makeImplSlug(impl)
+	client := testfx.LoggedInClient(t, app, user)
+	csrfToken, postClient := getCSRFToken(t, client, "/t/badstatus-team/i/"+slug+"/f/f")
+
+	resp := postClient.POSTForm("/t/badstatus-team/i/"+slug+"/f/f/acid/AC-1/status", url.Values{
+		"status":             {"banana"},
+		"gorilla.csrf.Token": {csrfToken},
+	})
+	if resp.Status() != http.StatusUnprocessableEntity {
+		t.Fatalf("expected 422 for bad status; got %d", resp.Status())
 	}
 }
 
