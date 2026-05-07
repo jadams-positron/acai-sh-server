@@ -807,6 +807,47 @@ code {
     white-space: pre;
 }
 
+/* === Snippet with copy button === */
+.snippet-with-copy {
+    position: relative;
+}
+
+.copy-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-subtle);
+    background: rgba(var(--color-surface), 0.85);
+    color: var(--muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition:
+        color 0.2s ease,
+        border-color 0.2s ease,
+        background 0.2s ease;
+}
+
+.copy-btn:hover {
+    color: var(--accent);
+    border-color: var(--border);
+    background: rgba(var(--color-accent-rgb), 0.06);
+}
+
+.copy-btn[data-copied="true"],
+.snippet-with-copy [data-copied="true"] {
+    color: var(--success);
+    border-color: var(--success);
+}
+
+.copy-icon-glyph {
+    flex-shrink: 0;
+}
+
 /* === Install steps (CLI onboarding) === */
 .install-steps {
     list-style: none;

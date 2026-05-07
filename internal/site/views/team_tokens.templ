@@ -24,10 +24,11 @@ templ TeamTokens(p TeamTokensProps) {
 			<h1 class="title">API Tokens</h1>
 		</header>
 		if p.NewlyCreatedToken != "" {
-			<div class="banner banner-success" style="font-family: var(--font-mono, monospace); word-break: break-all; margin-bottom: var(--space-md);">
+			<div class="banner banner-success" style="margin-bottom: var(--space-md);">
 				<strong>Save this token — you will not see it again:</strong>
-				<br/>
-				{ p.NewlyCreatedToken }
+				@snippetWithCopy() {
+					<code class="empty-state-snippet copy-target" style="margin-top: var(--space-sm); word-break: break-all;">{ p.NewlyCreatedToken }</code>
+				}
 			</div>
 			<section class="panel" style="margin-bottom: var(--space-xl);">
 				<h2 style="font-size: var(--text-xl); margin: 0 0 var(--space-md);">Next steps</h2>
